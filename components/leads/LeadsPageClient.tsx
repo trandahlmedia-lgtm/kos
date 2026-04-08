@@ -7,6 +7,16 @@ import { KanbanColumn } from './KanbanColumn'
 import { LeadDetailPanel } from './LeadDetailPanel'
 import { NewLeadDialog } from './NewLeadDialog'
 import { BulkImportDialog } from './BulkImportDialog'
+import { LeadsToolbar } from './LeadsToolbar'
+import { LeadsListView } from './LeadsListView'
+import {
+  type ViewMode,
+  type SortKey,
+  type FilterState,
+  DEFAULT_FILTERS,
+  filterLeads,
+  sortLeads,
+} from './leadsUtils'
 import type { Lead, LeadStage } from '@/types'
 
 const STAGES: LeadStage[] = ['new', 'reached_out', 'connected', 'interested', 'proposal_sent', 'won', 'lost']
@@ -21,6 +31,9 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
   const [panelOpen, setPanelOpen] = useState(false)
   const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [view, setView] = useState<ViewMode>('kanban')
+  const [sortKey, setSortKey] = useState<SortKey>('priority')
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
 
   function openLead(lead: Lead) {
     setSelectedLeadId(lead.id)
@@ -39,9 +52,12 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
     setLeads((prev) => [lead, ...prev])
   }
 
+  const filteredLeads = filterLeads(leads, filters)
+  const sortedLeads = sortLeads(filteredLeads, sortKey)
+
   const leadsByStage = STAGES.reduce<Record<LeadStage, Lead[]>>(
     (acc, stage) => {
-      acc[stage] = leads.filter((l) => l.stage === stage)
+      acc[stage] = sortedLeads.filter((l) => l.stage === stage)
       return acc
     },
     {} as Record<LeadStage, Lead[]>
@@ -74,19 +90,42 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         </div>
       </div>
 
-      {/* Kanban board */}
-      <div className="flex-1 overflow-x-auto">
-        <div className="flex gap-4 px-6 py-5 min-w-max">
-          {STAGES.map((stage) => (
-            <KanbanColumn
-              key={stage}
-              stage={stage}
-              leads={leadsByStage[stage]}
-              onLeadClick={openLead}
-            />
-          ))}
+      {/* Toolbar */}
+      <LeadsToolbar
+        view={view}
+        onViewChange={setView}
+        sortKey={sortKey}
+        onSortChange={setSortKey}
+        filters={filters}
+        onFiltersChange={setFilters}
+        allLeads={leads}
+        filteredCount={filteredLeads.length}
+        totalCount={leads.length}
+      />
+
+      {/* View area */}
+      {view === 'kanban' ? (
+        <div className="flex-1 overflow-x-auto">
+          <div className="flex gap-4 px-6 py-5 min-w-max">
+            {STAGES.map((stage) => (
+              <KanbanColumn
+                key={stage}
+                stage={stage}
+                leads={leadsByStage[stage]}
+                onLeadClick={openLead}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 overflow-auto px-6 py-4">
+          <LeadsListView
+            leads={sortedLeads}
+            onLeadClick={openLead}
+            totalCount={leads.length}
+          />
+        </div>
+      )}
 
       {/* Detail panel */}
       <LeadDetailPanel

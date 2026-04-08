@@ -2,16 +2,7 @@
 
 import type { Lead, LeadStage } from '@/types'
 import { LeadCard } from './LeadCard'
-
-const STAGE_LABELS: Record<LeadStage, string> = {
-  new: 'New',
-  reached_out: 'Reached Out',
-  connected: 'Connected',
-  interested: 'Interested',
-  proposal_sent: 'Proposal Sent',
-  won: 'Won',
-  lost: 'Lost',
-}
+import { STAGE_LABELS } from './leadsUtils'
 
 interface KanbanColumnProps {
   stage: LeadStage

@@ -53,6 +53,9 @@ interface LeadsToolbarProps {
   batchLeadIds?: string[]
   onBatchComplete?: () => void
   onCancelBatch?: () => void
+  showDisqualified?: boolean
+  onShowDisqualifiedChange?: (show: boolean) => void
+  disqualifiedCount?: number
 }
 
 function toggleInArray<T>(arr: T[], value: T): T[] {
@@ -76,6 +79,9 @@ export function LeadsToolbar({
   batchLeadIds,
   onBatchComplete,
   onCancelBatch,
+  showDisqualified,
+  onShowDisqualifiedChange,
+  disqualifiedCount,
 }: LeadsToolbarProps) {
   const activeFilterCount = countActiveFilters(filters)
   const isBatchActive = (batchLeadIds?.length ?? 0) > 0
@@ -101,6 +107,20 @@ export function LeadsToolbar({
         {viewBtn('kanban', <LayoutGrid size={14} />)}
         {viewBtn('list', <List size={14} />)}
       </div>
+
+      {/* Show disqualified toggle (list view only) */}
+      {view === 'list' && (disqualifiedCount ?? 0) > 0 && onShowDisqualifiedChange && (
+        <button
+          onClick={() => onShowDisqualifiedChange(!showDisqualified)}
+          className={`text-xs px-2 py-1 rounded transition-colors ${
+            showDisqualified
+              ? 'text-red-400 bg-red-500/10 border border-red-500/20'
+              : 'text-[#555555] hover:text-[#999999]'
+          }`}
+        >
+          {showDisqualified ? 'Hide' : 'Show'} disqualified ({disqualifiedCount})
+        </button>
+      )}
 
       {/* Right group */}
       <div className="ml-auto flex items-center gap-2">

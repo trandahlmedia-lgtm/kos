@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Trash2, UserCheck } from 'lucide-react'
+import { Trash2, UserCheck, Ban, RotateCcw } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { LeadResearchTab } from './LeadResearchTab'
 import { LeadNotesTab } from './LeadNotesTab'
 import { CallPrepTab } from './CallPrepTab'
 import { ConvertLeadDialog } from './ConvertLeadDialog'
+import { DisqualifyDialog } from './DisqualifyDialog'
 import { QuickLinks } from './QuickLinks'
 import type { Lead, LeadResearch, LeadActivity, LeadStage } from '@/types'
 
@@ -39,6 +40,8 @@ export function LeadDetailPanel({
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showConvert, setShowConvert] = useState(false)
+  const [showDisqualify, setShowDisqualify] = useState(false)
+  const [requalifying, setRequalifying] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
@@ -114,8 +117,39 @@ export function LeadDetailPanel({
     }
   }
 
+  async function handleDisqualify(reason: string) {
+    if (!leadId) return
+    const res = await fetch(`/api/leads/${leadId}/disqualify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    if (!res.ok) throw new Error('Failed to disqualify lead')
+    const json = await res.json() as { lead: Lead }
+    onLeadUpdated(json.lead)
+    await fetchData()
+  }
+
+  async function handleRequalify() {
+    if (!leadId) return
+    setRequalifying(true)
+    try {
+      const res = await fetch(`/api/leads/${leadId}/requalify`, { method: 'POST' })
+      if (!res.ok) {
+        setLoadError('Failed to re-qualify lead')
+        return
+      }
+      const json = await res.json() as { lead: Lead }
+      onLeadUpdated(json.lead)
+      await fetchData()
+    } finally {
+      setRequalifying(false)
+    }
+  }
+
   const lead = data?.lead
   const isWon = lead?.stage === 'won'
+  const isDisqualified = lead?.stage === 'lost' && lead?.heat_level === 'cut'
 
   return (
     <>
@@ -160,6 +194,28 @@ export function LeadDetailPanel({
                         Convert
                       </Button>
                     )}
+                    {isDisqualified ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleRequalify}
+                        disabled={requalifying}
+                        className="h-7 text-xs text-[#999999] hover:text-white"
+                      >
+                        <RotateCcw size={12} className="mr-1" />
+                        Re-qualify
+                      </Button>
+                    ) : !isWon && lead.stage !== 'lost' ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowDisqualify(true)}
+                        className="h-7 text-xs text-[#555555] hover:text-red-400"
+                      >
+                        <Ban size={12} className="mr-1" />
+                        Disqualify
+                      </Button>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -228,12 +284,20 @@ export function LeadDetailPanel({
       </Sheet>
 
       {lead && (
-        <ConvertLeadDialog
-          open={showConvert}
-          lead={lead}
-          research={data?.research ?? null}
-          onClose={() => setShowConvert(false)}
-        />
+        <>
+          <ConvertLeadDialog
+            open={showConvert}
+            lead={lead}
+            research={data?.research ?? null}
+            onClose={() => setShowConvert(false)}
+          />
+          <DisqualifyDialog
+            open={showDisqualify}
+            businessName={lead.business_name}
+            onClose={() => setShowDisqualify(false)}
+            onConfirm={handleDisqualify}
+          />
+        </>
       )}
     </>
   )

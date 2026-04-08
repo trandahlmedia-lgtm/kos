@@ -154,6 +154,14 @@ export function filterLeads(leads: Lead[], filters: FilterState): Lead[] {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Disqualified check
+// ---------------------------------------------------------------------------
+
+export function isDisqualified(lead: Lead): boolean {
+  return lead.stage === 'lost' && lead.heat_level === 'cut'
+}
+
 export function getDistinctIndustries(leads: Lead[]): string[] {
   return [...new Set(leads.map((l) => l.industry).filter(Boolean) as string[])].sort()
 }

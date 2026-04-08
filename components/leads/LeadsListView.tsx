@@ -2,7 +2,7 @@
 
 import { FlaskConical, Search, Loader2 } from 'lucide-react'
 import type { Lead } from '@/types'
-import { STAGE_LABELS, scoreColor } from './leadsUtils'
+import { STAGE_LABELS, scoreColor, isDisqualified } from './leadsUtils'
 import { EmptyState } from '@/components/shared/EmptyState'
 
 interface LeadsListViewProps {
@@ -89,7 +89,9 @@ export function LeadsListView({ leads, onLeadClick, totalCount, researchingLeadI
             <tr
               key={lead.id}
               onClick={() => onLeadClick(lead)}
-              className="cursor-pointer hover:bg-[#161616] transition-colors border-b border-[#1a1a1a]"
+              className={`cursor-pointer hover:bg-[#161616] transition-colors border-b border-[#1a1a1a] ${
+                isDisqualified(lead) ? 'opacity-40' : ''
+              }`}
             >
               {hasSelection && (
                 <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>

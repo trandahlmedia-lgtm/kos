@@ -27,6 +27,7 @@ import {
   DEFAULT_FILTERS,
   filterLeads,
   sortLeads,
+  isDisqualified,
 } from './leadsUtils'
 import type { Lead, LeadStage } from '@/types'
 
@@ -46,6 +47,7 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
   const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
+  const [showDisqualified, setShowDisqualified] = useState(false)
 
   // Research tracking — poll for leads with status 'running'
   const [researchingLeadIds, setResearchingLeadIds] = useState<Set<string>>(new Set())
@@ -265,9 +267,15 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
   const filteredLeads = filterLeads(leads, filters)
   const sortedLeads = sortLeads(filteredLeads, sortKey, sortDirection)
 
+  // Kanban: never show disqualified leads
+  const kanbanLeads = sortedLeads.filter((l) => !isDisqualified(l))
+  // List: hide disqualified unless toggled on
+  const listLeads = showDisqualified ? sortedLeads : sortedLeads.filter((l) => !isDisqualified(l))
+  const disqualifiedCount = leads.filter(isDisqualified).length
+
   const leadsByStage = STAGES.reduce<Record<LeadStage, Lead[]>>(
     (acc, stage) => {
-      acc[stage] = sortedLeads.filter((l) => l.stage === stage)
+      acc[stage] = kanbanLeads.filter((l) => l.stage === stage)
       return acc
     },
     {} as Record<LeadStage, Lead[]>
@@ -318,6 +326,9 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         batchLeadIds={batchLeadIdsArray}
         onBatchComplete={handleBatchComplete}
         onCancelBatch={cancelBatchResearch}
+        showDisqualified={showDisqualified}
+        onShowDisqualifiedChange={setShowDisqualified}
+        disqualifiedCount={disqualifiedCount}
       />
 
       {/* View area */}
@@ -353,7 +364,7 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
       ) : (
         <div className="flex-1 overflow-auto px-6 py-4">
           <LeadsListView
-            leads={sortedLeads}
+            leads={listLeads}
             onLeadClick={openLead}
             totalCount={leads.length}
             researchingLeadIds={researchingLeadIds}

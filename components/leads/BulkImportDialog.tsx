@@ -21,7 +21,7 @@ export function BulkImportDialog({ open, onClose, onImported }: BulkImportDialog
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [mapping, setMapping] = useState<ColumnMapping | null>(null)
   const [error, setError] = useState('')
-  const [result, setResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null)
+  const [result, setResult] = useState<{ imported: number; skipped: number; disqualifiedSkipped: number; errors: string[] } | null>(null)
 
   function handleClose() {
     setStep('upload')
@@ -76,6 +76,7 @@ export function BulkImportDialog({ open, onClose, onImported }: BulkImportDialog
     setResult({
       imported: importResult.imported,
       skipped: importResult.skipped,
+      disqualifiedSkipped: importResult.disqualifiedSkipped,
       errors: importResult.errors,
     })
     setStep('done')
@@ -228,6 +229,11 @@ export function BulkImportDialog({ open, onClose, onImported }: BulkImportDialog
               {result.skipped > 0 && (
                 <div className="px-3 py-1.5 rounded bg-yellow-500/10 text-yellow-400">
                   {result.skipped} duplicates skipped
+                </div>
+              )}
+              {result.disqualifiedSkipped > 0 && (
+                <div className="px-3 py-1.5 rounded bg-red-500/10 text-red-400">
+                  {result.disqualifiedSkipped} skipped (previously disqualified)
                 </div>
               )}
             </div>

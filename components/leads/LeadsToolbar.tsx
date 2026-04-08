@@ -1,10 +1,11 @@
 'use client'
 
-import { LayoutGrid, List, ArrowUpDown, Filter, X } from 'lucide-react'
+import { LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuCheckboxItem,
@@ -16,6 +17,7 @@ import type { Lead, LeadSource, LeadHeatLevel, LeadStage } from '@/types'
 import {
   type ViewMode,
   type SortKey,
+  type SortDirection,
   type FilterState,
   DEFAULT_FILTERS,
   SORT_LABELS,
@@ -36,6 +38,8 @@ interface LeadsToolbarProps {
   onViewChange: (v: ViewMode) => void
   sortKey: SortKey
   onSortChange: (k: SortKey) => void
+  sortDirection: SortDirection
+  onSortDirectionChange: (d: SortDirection) => void
   filters: FilterState
   onFiltersChange: (f: FilterState) => void
   allLeads: Lead[]
@@ -52,6 +56,8 @@ export function LeadsToolbar({
   onViewChange,
   sortKey,
   onSortChange,
+  sortDirection,
+  onSortDirectionChange,
   filters,
   onFiltersChange,
   allLeads,
@@ -84,27 +90,38 @@ export function LeadsToolbar({
 
       {/* Right group */}
       <div className="ml-auto flex items-center gap-2">
-        {/* Sort dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="inline-flex items-center gap-1.5 border border-[#2a2a2a] text-[#999999] hover:text-white h-7 text-xs px-2.5 rounded-md bg-transparent transition-colors"
-          >
-            <ArrowUpDown size={13} />
-            {SORT_LABELS[sortKey]}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[160px]">
-            <DropdownMenuRadioGroup
-              value={sortKey}
-              onValueChange={(v) => onSortChange(v as SortKey)}
+        {/* Sort dropdown + direction toggle */}
+        <div className="flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="inline-flex items-center gap-1.5 border border-[#2a2a2a] border-r-0 text-[#999999] hover:text-white h-7 text-xs px-2.5 rounded-l-md bg-transparent transition-colors"
             >
-              {SORT_KEYS.map((key) => (
-                <DropdownMenuRadioItem key={key} value={key}>
-                  {SORT_LABELS[key]}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <ArrowUpDown size={13} />
+              {SORT_LABELS[sortKey]}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[160px]">
+              <DropdownMenuGroup>
+                <DropdownMenuRadioGroup
+                  value={sortKey}
+                  onValueChange={(v) => onSortChange(v as SortKey)}
+                >
+                  {SORT_KEYS.map((key) => (
+                    <DropdownMenuRadioItem key={key} value={key}>
+                      {SORT_LABELS[key]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button
+            onClick={() => onSortDirectionChange(sortDirection === 'desc' ? 'asc' : 'desc')}
+            className="inline-flex items-center justify-center border border-[#2a2a2a] text-[#999999] hover:text-white h-7 w-7 rounded-r-md bg-transparent transition-colors"
+            title={sortDirection === 'desc' ? 'Highest first' : 'Lowest first'}
+          >
+            {sortDirection === 'desc' ? <ArrowDown size={13} /> : <ArrowUp size={13} />}
+          </button>
+        </div>
 
         {/* Filters dropdown */}
         <DropdownMenu>
@@ -121,115 +138,123 @@ export function LeadsToolbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[280px]">
             {/* Website */}
-            <DropdownMenuLabel>Website</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={filters.hasWebsite}
-              onValueChange={(v) =>
-                onFiltersChange({ ...filters, hasWebsite: v as FilterState['hasWebsite'] })
-              }
-            >
-              <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="no">No Website</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="yes">Has Website</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Website</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={filters.hasWebsite}
+                onValueChange={(v) =>
+                  onFiltersChange({ ...filters, hasWebsite: v as FilterState['hasWebsite'] })
+                }
+              >
+                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="no">No Website</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="yes">Has Website</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
             {/* AI Researched */}
-            <DropdownMenuLabel>AI Researched</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={filters.aiResearched}
-              onValueChange={(v) =>
-                onFiltersChange({ ...filters, aiResearched: v as FilterState['aiResearched'] })
-              }
-            >
-              <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="yes">Researched</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="no">Not Researched</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>AI Researched</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={filters.aiResearched}
+                onValueChange={(v) =>
+                  onFiltersChange({ ...filters, aiResearched: v as FilterState['aiResearched'] })
+                }
+              >
+                <DropdownMenuRadioItem value="all">All</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="yes">Researched</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="no">Not Researched</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
             {/* Industry */}
             {industries.length > 0 && (
               <>
-                <DropdownMenuLabel>Industry</DropdownMenuLabel>
-                {industries.map((ind) => (
-                  <DropdownMenuCheckboxItem
-                    key={ind}
-                    checked={filters.industries.includes(ind)}
-                    closeOnClick={false}
-                    onCheckedChange={() =>
-                      onFiltersChange({
-                        ...filters,
-                        industries: toggleInArray(filters.industries, ind),
-                      })
-                    }
-                  >
-                    {ind}
-                  </DropdownMenuCheckboxItem>
-                ))}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Industry</DropdownMenuLabel>
+                  {industries.map((ind) => (
+                    <DropdownMenuCheckboxItem
+                      key={ind}
+                      checked={filters.industries.includes(ind)}
+                      onCheckedChange={() =>
+                        onFiltersChange({
+                          ...filters,
+                          industries: toggleInArray(filters.industries, ind),
+                        })
+                      }
+                    >
+                      {ind}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
               </>
             )}
 
             {/* Source */}
-            <DropdownMenuLabel>Source</DropdownMenuLabel>
-            {ALL_SOURCES.map((src) => (
-              <DropdownMenuCheckboxItem
-                key={src}
-                checked={filters.sources.includes(src)}
-                closeOnClick={false}
-                onCheckedChange={() =>
-                  onFiltersChange({
-                    ...filters,
-                    sources: toggleInArray(filters.sources, src),
-                  })
-                }
-              >
-                {SOURCE_LABELS[src]}
-              </DropdownMenuCheckboxItem>
-            ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Source</DropdownMenuLabel>
+              {ALL_SOURCES.map((src) => (
+                <DropdownMenuCheckboxItem
+                  key={src}
+                  checked={filters.sources.includes(src)}
+                  onCheckedChange={() =>
+                    onFiltersChange({
+                      ...filters,
+                      sources: toggleInArray(filters.sources, src),
+                    })
+                  }
+                >
+                  {SOURCE_LABELS[src]}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
             {/* Heat Level */}
-            <DropdownMenuLabel>Heat Level</DropdownMenuLabel>
-            {ALL_HEAT_LEVELS.map((heat) => (
-              <DropdownMenuCheckboxItem
-                key={heat}
-                checked={filters.heatLevels.includes(heat)}
-                closeOnClick={false}
-                onCheckedChange={() =>
-                  onFiltersChange({
-                    ...filters,
-                    heatLevels: toggleInArray(filters.heatLevels, heat),
-                  })
-                }
-              >
-                {HEAT_LABELS[heat]}
-              </DropdownMenuCheckboxItem>
-            ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Heat Level</DropdownMenuLabel>
+              {ALL_HEAT_LEVELS.map((heat) => (
+                <DropdownMenuCheckboxItem
+                  key={heat}
+                  checked={filters.heatLevels.includes(heat)}
+                  onCheckedChange={() =>
+                    onFiltersChange({
+                      ...filters,
+                      heatLevels: toggleInArray(filters.heatLevels, heat),
+                    })
+                  }
+                >
+                  {HEAT_LABELS[heat]}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
 
             <DropdownMenuSeparator />
 
             {/* Stage */}
-            <DropdownMenuLabel>Stage</DropdownMenuLabel>
-            {ALL_STAGES.map((stage) => (
-              <DropdownMenuCheckboxItem
-                key={stage}
-                checked={filters.stages.includes(stage)}
-                closeOnClick={false}
-                onCheckedChange={() =>
-                  onFiltersChange({
-                    ...filters,
-                    stages: toggleInArray(filters.stages, stage),
-                  })
-                }
-              >
-                {STAGE_LABELS[stage]}
-              </DropdownMenuCheckboxItem>
-            ))}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Stage</DropdownMenuLabel>
+              {ALL_STAGES.map((stage) => (
+                <DropdownMenuCheckboxItem
+                  key={stage}
+                  checked={filters.stages.includes(stage)}
+                  onCheckedChange={() =>
+                    onFiltersChange({
+                      ...filters,
+                      stages: toggleInArray(filters.stages, stage),
+                    })
+                  }
+                >
+                  {STAGE_LABELS[stage]}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
 
             {/* Clear all */}
             {activeFilterCount > 0 && (

@@ -7,6 +7,7 @@ import type { Lead, LeadSource, LeadHeatLevel, LeadStage } from '@/types'
 export type ViewMode = 'kanban' | 'list'
 
 export type SortKey = 'priority' | 'review_count' | 'rating' | 'ai_score' | 'newest'
+export type SortDirection = 'desc' | 'asc'
 
 export interface FilterState {
   hasWebsite: 'yes' | 'no' | 'all'
@@ -90,28 +91,29 @@ export function computePriorityScore(lead: Lead): number {
 // Sort
 // ---------------------------------------------------------------------------
 
-export function sortLeads(leads: Lead[], sortKey: SortKey): Lead[] {
+export function sortLeads(leads: Lead[], sortKey: SortKey, direction: SortDirection = 'desc'): Lead[] {
   const sorted = [...leads]
+  const dir = direction === 'desc' ? 1 : -1
   switch (sortKey) {
     case 'priority':
-      sorted.sort((a, b) => computePriorityScore(b) - computePriorityScore(a))
+      sorted.sort((a, b) => dir * (computePriorityScore(b) - computePriorityScore(a)))
       break
     case 'review_count':
-      sorted.sort((a, b) => (b.review_count ?? -1) - (a.review_count ?? -1))
+      sorted.sort((a, b) => dir * ((b.review_count ?? -1) - (a.review_count ?? -1)))
       break
     case 'rating':
-      sorted.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
+      sorted.sort((a, b) => dir * ((b.rating ?? -1) - (a.rating ?? -1)))
       break
     case 'ai_score':
       sorted.sort((a, b) => {
         if (a.ai_score === null && b.ai_score === null) return 0
         if (a.ai_score === null) return 1
         if (b.ai_score === null) return -1
-        return b.ai_score - a.ai_score
+        return dir * (b.ai_score - a.ai_score)
       })
       break
     case 'newest':
-      sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      sorted.sort((a, b) => dir * (new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))
       break
   }
   return sorted

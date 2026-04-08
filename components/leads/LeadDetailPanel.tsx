@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { LeadOverviewTab } from './LeadOverviewTab'
 import { LeadResearchTab } from './LeadResearchTab'
 import { LeadNotesTab } from './LeadNotesTab'
+import { CallPrepTab } from './CallPrepTab'
 import { ConvertLeadDialog } from './ConvertLeadDialog'
 import type { Lead, LeadResearch, LeadActivity, LeadStage } from '@/types'
 
@@ -139,6 +140,9 @@ export function LeadDetailPanel({
                   <TabsTrigger value="overview" className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-[#E8732A] data-[state=active]:text-white text-[#555555] px-3 py-2">
                     Overview
                   </TabsTrigger>
+                  <TabsTrigger value="call-prep" className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-[#E8732A] data-[state=active]:text-white text-[#555555] px-3 py-2">
+                    Call Prep
+                  </TabsTrigger>
                   <TabsTrigger value="research" className="text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-[#E8732A] data-[state=active]:text-white text-[#555555] px-3 py-2">
                     Research
                     {lead.ai_score !== null && (
@@ -153,6 +157,9 @@ export function LeadDetailPanel({
                 <div className="flex-1 overflow-y-auto">
                   <TabsContent value="overview" className="m-0 p-5">
                     <LeadOverviewTab lead={lead} onUpdate={handleUpdate} onStageChange={handleStageChange} />
+                  </TabsContent>
+                  <TabsContent value="call-prep" className="m-0 p-5">
+                    <CallPrepTab lead={lead} research={data?.research ?? null} />
                   </TabsContent>
                   <TabsContent value="research" className="m-0 p-5">
                     <LeadResearchTab

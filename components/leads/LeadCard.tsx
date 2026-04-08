@@ -1,12 +1,15 @@
 'use client'
 
 import { Phone, FlaskConical } from 'lucide-react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { Lead } from '@/types'
 import { ScoreDisplay } from './ScoreDisplay'
 
 interface LeadCardProps {
   lead: Lead
   onClick: () => void
+  isDragOverlay?: boolean
 }
 
 function researchBadge(score: number | null) {
@@ -16,11 +19,45 @@ function researchBadge(score: number | null) {
   )
 }
 
-export function LeadCard({ lead, onClick }: LeadCardProps) {
+export function LeadCard({ lead, onClick, isDragOverlay }: LeadCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: lead.id,
+    data: { type: 'lead', lead },
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  if (isDragging && !isDragOverlay) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="w-full bg-[#1a1a1a] border border-[#E8732A]/30 rounded-md px-3 py-2.5 opacity-30"
+      >
+        <span className="text-sm text-transparent">{lead.business_name}</span>
+      </div>
+    )
+  }
+
   return (
     <button
+      ref={isDragOverlay ? undefined : setNodeRef}
+      style={isDragOverlay ? undefined : style}
       onClick={onClick}
-      className="w-full text-left bg-[#111111] border border-[#2a2a2a] rounded-md px-3 py-2.5 hover:border-[#3a3a3a] hover:bg-[#161616] transition-colors"
+      {...(isDragOverlay ? {} : { ...attributes, ...listeners })}
+      className={`w-full text-left bg-[#111111] border border-[#2a2a2a] rounded-md px-3 py-2.5 hover:border-[#3a3a3a] hover:bg-[#161616] transition-colors ${
+        isDragOverlay ? 'shadow-lg shadow-black/50 border-[#E8732A]/40 cursor-grabbing' : 'cursor-grab active:cursor-grabbing'
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-medium text-white leading-tight truncate">

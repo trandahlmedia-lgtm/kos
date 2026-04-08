@@ -74,8 +74,10 @@ Text muted:       #555555
 | 4-UX1 | Lead priority sorting & filtering — list view, sort by priority/reviews/rating/score, quick filter presets, industry/stage/website filters | ✅ Complete |
 | 4-UX2 | Bug fixes + UX improvements — filter error fix, sort direction toggle, call prep view with talk track, drag-and-drop kanban | ✅ Complete |
 | 4-UX3 | Call prep pricing split — website sale (one-time) vs retainer (monthly) as separate cards | ✅ Complete |
-| 4-UX4 | Batch research + research cancellation fix — research runs server-side, batch "Research Top 20" button, progress tracking | ⚠️ In Progress (may need push + deploy) |
-| 4-UX5 | Quick links bar — one-click access to lead's website, Google Business, Facebook, Instagram from detail panel | 📋 Queued (prompt ready, run after 4-UX4) |
+| 4-UX4 | Batch research + research cancellation fix — research runs server-side, batch "Research Top 20" button, progress tracking | ✅ Complete |
+| 4-UX4b | Sequential research queue + progress dropdown — research runs one lead at a time, top-right loading indicator expands to show full queue, active lead shows step-by-step checklist progress | ✅ Complete |
+| 4-UX5 | Quick links bar — one-click access to lead's website, Google Business, Facebook, Instagram from detail panel | 📋 Queued (prompt ready) |
+| 4-UX6 | Disqualify/remove dead lead — mark lead as disqualified, auto-unsubscribe from outreach, remove from active pipeline (keep record to prevent re-import) | 📋 Queued (needs prompt) |
 | 5 | Personal Dashboard / Command Center — today view, weekly planning, industry feed, priority filter | Pending |
 | 6 | VA Workflow Support — role layer, VA view, approval queue | Pending |
 | Future | Website builder workstation, ad campaign management, KOS AI assistant, media library, billing | Pending |
@@ -113,8 +115,9 @@ Text muted:       #555555
 - Filters and priority sorting working on leads page
 - Call prep view with talk track, pricing split (website vs retainer), and objection handles working
 - Drag-and-drop kanban working
-- **IN PROGRESS:** Batch research (runs research on multiple leads server-side) + fix for research cancelling when closing the panel
-- **QUEUED:** Quick links bar (one-click access to lead's website/socials from detail panel)
+- **QUEUED:** Quick links bar (one-click access to lead's website/socials from detail panel) — prompt ready, run next
+- **QUEUED:** Disqualify/remove dead lead — needs prompt written
+- Batch research is working sequentially with progress dropdown
 
 **Jay's immediate priority:** Start running research on top leads and sending outreach emails to sell websites.
 
@@ -122,10 +125,11 @@ Text muted:       #555555
 
 ## WHAT'S NEXT TO BUILD (in priority order)
 
-### Immediate (finish current session)
-1. Confirm batch research + research cancellation fix deployed and working
-2. Run quick links prompt (saved below)
-3. Push, deploy, test
+### Immediate (next session)
+1. Deploy and test sequential queue + progress dropdown (just pushed)
+2. Run quick links prompt (4-UX5) — saved below
+3. Write and run disqualify lead prompt (4-UX6)
+4. Push, deploy, test each
 
 ### Next build phase: Personal Dashboard / Command Center
 - Today view: hot leads to call, emails to review, content needing approval, follow-ups due
@@ -240,4 +244,4 @@ Vercel auto-deploys from main after each push.
 
 ---
 
-*Last updated: 2026-04-09. Phases 1–4B complete and deployed. Outreach engine live. 124 leads imported. Batch research + quick links in progress.*
+*Last updated: 2026-04-08. Phases 1–4B + 4-UX1 through 4-UX4b complete and deployed. Sequential research queue + progress dropdown just pushed. Quick links (4-UX5) and disqualify lead (4-UX6) queued next. 124 Duluth leads imported. Ready to start sending outreach.*

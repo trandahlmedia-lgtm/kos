@@ -10,9 +10,10 @@ interface KanbanColumnProps {
   stage: LeadStage
   leads: Lead[]
   onLeadClick: (lead: Lead) => void
+  researchingLeadIds?: Set<string>
 }
 
-export function KanbanColumn({ stage, leads, onLeadClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, leads, onLeadClick, researchingLeadIds }: KanbanColumnProps) {
   const isWon = stage === 'won'
   const isLost = stage === 'lost'
 
@@ -51,7 +52,7 @@ export function KanbanColumn({ stage, leads, onLeadClick }: KanbanColumnProps) {
             </div>
           ) : (
             leads.map((lead) => (
-              <LeadCard key={lead.id} lead={lead} onClick={() => onLeadClick(lead)} />
+              <LeadCard key={lead.id} lead={lead} onClick={() => onLeadClick(lead)} isResearching={researchingLeadIds?.has(lead.id)} />
             ))
           )}
         </SortableContext>

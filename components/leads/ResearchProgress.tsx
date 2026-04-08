@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { CheckCircle, Loader2, Circle } from 'lucide-react'
 
 interface Step {
@@ -19,90 +19,130 @@ const STEPS: Step[] = [
 
 type StepStatus = 'pending' | 'running' | 'complete'
 
+interface StatusResponse {
+  status: 'none' | 'running' | 'completed' | 'failed' | 'pending'
+  error_message?: string | null
+  overall_score?: number | null
+  steps: Record<string, StepStatus>
+}
+
 interface ResearchProgressProps {
   leadId: string
+  /** If true, only poll — don't trigger the research POST */
+  pollOnly?: boolean
   onComplete: () => void
   onError: (msg: string) => void
 }
 
-export function ResearchProgress({ leadId, onComplete, onError }: ResearchProgressProps) {
+const POLL_INTERVAL = 2000
+
+export function ResearchProgress({ leadId, pollOnly, onComplete, onError }: ResearchProgressProps) {
   const [steps, setSteps] = useState<Record<string, StepStatus>>(
     Object.fromEntries(STEPS.map((s) => [s.key, 'pending']))
   )
+  const [started, setStarted] = useState(!!pollOnly)
+  const cancelledRef = useRef(false)
 
+  // Start research (fire-and-forget POST) — only when not in pollOnly mode
   useEffect(() => {
-    const controller = new AbortController()
+    if (pollOnly) return
 
-    async function run() {
+    let cancelled = false
+    async function start() {
       try {
         const res = await fetch('/api/ai/lead-research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ lead_id: leadId }),
-          signal: controller.signal,
         })
+
+        if (cancelled) return
 
         if (!res.ok) {
           const err = await res.json() as { error?: string }
-          onError(err.error ?? 'Research failed')
+          // 409 = already running, still poll
+          if (res.status === 409) {
+            setStarted(true)
+            return
+          }
+          onError(err.error ?? 'Research failed to start')
           return
         }
 
-        if (!res.body) { onError('No response stream'); return }
-
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n\n')
-          buffer = lines.pop() ?? ''
-
-          for (const line of lines) {
-            const dataPart = line.replace(/^data: /, '').trim()
-            if (!dataPart) continue
-            try {
-              const event = JSON.parse(dataPart) as {
-                step: string
-                status?: string
-                message?: string
-              }
-
-              if (event.step === 'done') {
-                onComplete()
-                return
-              }
-              if (event.step === 'error') {
-                onError(event.message ?? 'Research failed')
-                return
-              }
-              if (event.status === 'running' || event.status === 'complete') {
-                setSteps((prev) => ({
-                  ...prev,
-                  [event.step]: event.status as StepStatus,
-                }))
-              }
-            } catch { /* skip malformed lines */ }
-          }
-        }
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          onError('Connection lost. Please try again.')
-        }
+        setStarted(true)
+      } catch {
+        if (!cancelled) onError('Failed to start research')
       }
     }
 
-    run()
-    return () => controller.abort()
-  }, [leadId, onComplete, onError])
+    start()
+    return () => { cancelled = true }
+  }, [leadId, pollOnly, onError])
+
+  // Poll for progress
+  useEffect(() => {
+    if (!started) return
+
+    cancelledRef.current = false
+
+    let failCount = 0
+    async function poll() {
+      try {
+        const res = await fetch(`/api/ai/lead-research/status?lead_id=${leadId}`)
+        if (cancelledRef.current) return
+        if (!res.ok) {
+          failCount++
+          if (failCount >= 5) {
+            onError('Lost connection to research status. Please refresh.')
+            return
+          }
+          // Continue polling on transient errors
+          if (!cancelledRef.current) {
+            timerId = window.setTimeout(poll, POLL_INTERVAL) as unknown as number
+          }
+          return
+        }
+        failCount = 0
+
+        const data = await res.json() as StatusResponse
+
+        if (data.status === 'completed') {
+          // Mark all steps complete
+          setSteps(Object.fromEntries(STEPS.map((s) => [s.key, 'complete' as StepStatus])))
+          onComplete()
+          return
+        }
+
+        if (data.status === 'failed') {
+          onError(data.error_message ?? 'Research failed')
+          return
+        }
+
+        if (data.status === 'running' && data.steps) {
+          setSteps(data.steps)
+        }
+      } catch {
+        // Silently retry on network errors
+      }
+
+      if (!cancelledRef.current) {
+        timerId = window.setTimeout(poll, POLL_INTERVAL) as unknown as number
+      }
+    }
+
+    let timerId: number
+    // Start first poll quickly
+    timerId = window.setTimeout(poll, 500) as unknown as number
+
+    return () => {
+      cancelledRef.current = true
+      window.clearTimeout(timerId)
+    }
+  }, [started, leadId, onComplete, onError])
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-[#999999]">Running 5 research agents + synthesis…</p>
+      <p className="text-sm text-[#999999]">Running 5 research agents + synthesis&hellip;</p>
       <div className="space-y-2">
         {STEPS.map((step) => {
           const status = steps[step.key] ?? 'pending'

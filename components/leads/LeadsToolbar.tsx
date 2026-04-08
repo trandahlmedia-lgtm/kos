@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from 'lucide-react'
+import { LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, FlaskConical, Loader2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -45,6 +45,8 @@ interface LeadsToolbarProps {
   allLeads: Lead[]
   filteredCount: number
   totalCount: number
+  onBatchResearch?: (leadIds: string[]) => void
+  researchingCount?: number
 }
 
 function toggleInArray<T>(arr: T[], value: T): T[] {
@@ -63,6 +65,8 @@ export function LeadsToolbar({
   allLeads,
   filteredCount,
   totalCount,
+  onBatchResearch,
+  researchingCount,
 }: LeadsToolbarProps) {
   const activeFilterCount = countActiveFilters(filters)
   const industries = getDistinctIndustries(allLeads)
@@ -276,6 +280,51 @@ export function LeadsToolbar({
           <span className="text-xs text-[#555555]">
             {filteredCount} of {totalCount}
           </span>
+        )}
+
+        {/* Researching indicator */}
+        {(researchingCount ?? 0) > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-[#E8732A]">
+            <Loader2 size={12} className="animate-spin" />
+            {researchingCount} researching
+          </span>
+        )}
+
+        {/* Batch research buttons */}
+        {onBatchResearch && (
+          <>
+            <div className="w-px h-4 bg-[#2a2a2a]" />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex items-center gap-1.5 border border-[#2a2a2a] text-[#999999] hover:text-white h-7 text-xs px-2.5 rounded-md bg-transparent transition-colors"
+              >
+                <FlaskConical size={13} />
+                Batch Research
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px]">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const newLeads = allLeads.filter((l) => l.stage === 'new' && l.ai_score === null)
+                      if (newLeads.length > 0) onBatchResearch(newLeads.map((l) => l.id))
+                    }}
+                  >
+                    <FlaskConical size={13} className="mr-2" />
+                    Research All New ({allLeads.filter((l) => l.stage === 'new' && l.ai_score === null).length})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const unresearched = allLeads.filter((l) => l.ai_score === null).slice(0, 20)
+                      if (unresearched.length > 0) onBatchResearch(unresearched.map((l) => l.id))
+                    }}
+                  >
+                    <FlaskConical size={13} className="mr-2" />
+                    Research Top 20 ({Math.min(20, allLeads.filter((l) => l.ai_score === null).length)})
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { Phone, FlaskConical } from 'lucide-react'
+import { Phone, FlaskConical, Loader2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Lead } from '@/types'
@@ -10,6 +10,7 @@ interface LeadCardProps {
   lead: Lead
   onClick: () => void
   isDragOverlay?: boolean
+  isResearching?: boolean
 }
 
 function researchBadge(score: number | null) {
@@ -19,7 +20,7 @@ function researchBadge(score: number | null) {
   )
 }
 
-export function LeadCard({ lead, onClick, isDragOverlay }: LeadCardProps) {
+export function LeadCard({ lead, onClick, isDragOverlay, isResearching }: LeadCardProps) {
   const {
     attributes,
     listeners,
@@ -86,7 +87,12 @@ export function LeadCard({ lead, onClick, isDragOverlay }: LeadCardProps) {
           readonly
           size="sm"
         />
-        {researchBadge(lead.ai_score)}
+        {isResearching ? (
+          <span className="flex items-center gap-1 text-[10px] text-[#E8732A]">
+            <Loader2 size={10} className="animate-spin" />
+            Researching
+          </span>
+        ) : researchBadge(lead.ai_score)}
       </div>
     </button>
   )

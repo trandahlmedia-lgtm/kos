@@ -18,28 +18,34 @@ interface LeadResearchTabProps {
 }
 
 export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExistingDrafts, research, onResearchComplete }: LeadResearchTabProps) {
-  const [running, setRunning] = useState(false)
+  // Auto-detect in-progress research on mount
+  const alreadyRunning = research?.status === 'running'
+  const [running, setRunning] = useState(alreadyRunning)
+  const [pollOnly, setPollOnly] = useState(alreadyRunning)
   const [error, setError] = useState<string | null>(null)
 
   const handleStart = () => {
     setError(null)
+    setPollOnly(false)
     setRunning(true)
   }
 
   const handleComplete = useCallback(() => {
     setRunning(false)
+    setPollOnly(false)
     onResearchComplete()
   }, [onResearchComplete])
 
   const handleError = useCallback((msg: string) => {
     setRunning(false)
+    setPollOnly(false)
     setError(msg)
   }, [])
 
   if (running) {
     return (
       <div className="space-y-4">
-        <ResearchProgress leadId={leadId} onComplete={handleComplete} onError={handleError} />
+        <ResearchProgress leadId={leadId} pollOnly={pollOnly} onComplete={handleComplete} onError={handleError} />
       </div>
     )
   }

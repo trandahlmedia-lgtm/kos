@@ -1,5 +1,5 @@
 # KOS — Session Handoff
-## Drop this into a new Claude Code session to pick up exactly where we left off.
+## Drop this into a new Cowork session to pick up exactly where we left off.
 
 ---
 
@@ -11,17 +11,19 @@
 
 **Current client:** Northern Standard Heating & Air — Full Service tier, $3,000/mo.
 
-**Goal next 3 months:** Sign 1-2 more solid clients.
+**Goal next 3 months:** Sign 1-2 more solid clients via outreach engine.
 
 ---
 
 ## WHAT WE'RE BUILDING
 
-**KOS — Konvyrt Operating System.** A private, internal web app for Jay and Dylan only. Single system for the entire agency: clients, content, leads, AI workflows, billing.
+**KOS — Konvyrt Operating System.** A private, internal web app for Jay and Dylan only. Single system for the entire agency: clients, content, leads, AI workflows, outreach, billing.
 
 Full project spec: `CLAUDE.md`
 Master build plan: `KOS_MasterBuildPlan.md`
 Phase 4 detailed spec: `KOS_Phase4_BuildPlan.md`
+Vision shift plan: `KOS_VisionShift_PlanningPrompt.md`
+Website workstation feature spec (future): `FEATURE_WebsiteWorkstation.md`
 
 Project folder: `C:\Users\jaytr\HQ\Projects\kos\`
 
@@ -33,9 +35,11 @@ Project folder: `C:\Users\jaytr\HQ\Projects\kos\`
 - **Database + Auth + Storage:** Supabase
 - **Styling:** Tailwind CSS v4 + shadcn/ui — dark mode only, no tailwind.config.ts
 - **AI:** Anthropic Claude API — Haiku/Sonnet/Opus tiered (see MODEL ROUTING in CLAUDE.md)
+- **Email:** Resend — sending from `jay@mail.konvyrt.com`, DNS verified (DKIM/SPF/DMARC on mail.konvyrt.com)
 - **Auth proxy:** `proxy.ts` at root — NOT middleware.ts (Next.js 16 convention)
 - **File processing:** Sharp
 - **Query caching:** TanStack React Query
+- **Drag & drop:** @dnd-kit/core + @dnd-kit/sortable
 - **Package manager:** npm
 
 ---
@@ -64,11 +68,17 @@ Text muted:       #555555
 | 1 | Login, sidebar, dashboard shell, clients, client hub | ✅ Complete |
 | 2 | Content engine — post cards, calendar, schedule panel, creative upload | ✅ Complete |
 | 3 | AI workflows — Claude API, weekly plan, captions, brand doc, platform bios, client intake | ✅ Complete |
-| 4 | Lead pipeline — kanban, research agent, scoring, call summary, conversion | ⬅ NEXT |
-| 5 | KOS AI assistant + media library + filming sessions + platform setup | Pending |
-| 6 | Ad campaign management + dashboard polish + billing | Pending |
-
-**Phase 3 was reviewed with Codex + lint + build — all clean before Phase 4 start.**
+| 4A-1 | Lead pipeline — kanban, research agent (5 Haiku + Sonnet orchestrator), AI scoring, CSV import, call summary, conversion | ✅ Complete |
+| 4B-1a | Email outreach backend — Resend integration, AI email drafting, server actions, webhook handler, follow-up scheduling, cron job, unsubscribe | ✅ Complete |
+| 4B-1b | Email outreach UI — outreach page, review queue, email card/editor, follow-ups due, hot leads, stats, settings dialog | ✅ Complete |
+| 4-UX1 | Lead priority sorting & filtering — list view, sort by priority/reviews/rating/score, quick filter presets, industry/stage/website filters | ✅ Complete |
+| 4-UX2 | Bug fixes + UX improvements — filter error fix, sort direction toggle, call prep view with talk track, drag-and-drop kanban | ✅ Complete |
+| 4-UX3 | Call prep pricing split — website sale (one-time) vs retainer (monthly) as separate cards | ✅ Complete |
+| 4-UX4 | Batch research + research cancellation fix — research runs server-side, batch "Research Top 20" button, progress tracking | ⚠️ In Progress (may need push + deploy) |
+| 4-UX5 | Quick links bar — one-click access to lead's website, Google Business, Facebook, Instagram from detail panel | 📋 Queued (prompt ready, run after 4-UX4) |
+| 5 | Personal Dashboard / Command Center — today view, weekly planning, industry feed, priority filter | Pending |
+| 6 | VA Workflow Support — role layer, VA view, approval queue | Pending |
+| Future | Website builder workstation, ad campaign management, KOS AI assistant, media library, billing | Pending |
 
 ---
 
@@ -76,55 +86,131 @@ Text muted:       #555555
 
 | Item | Status |
 |------|--------|
-| GitHub repo | ✅ https://github.com/trandahlmedia-lgtm/kos.git |
+| GitHub repo | ✅ https://github.com/trandahlmedia-lgtm/kos.git (branch: main, public) |
 | Supabase project | ✅ US East (N. Virginia) |
-| Supabase migrations | ✅ 001_rate_limits.sql applied |
+| Supabase migrations | ✅ 001 through 006 applied (rate_limits, leads, lead_research, lead_activities, outreach_engine, outreach_settings) |
 | Supabase storage bucket | ✅ kos-media (private) |
 | Supabase Realtime | ✅ Enabled on posts, leads, clients |
-| Supabase users | ✅ Jay + Dylan |
-| Anthropic API key | ✅ In .env.local |
-| Vercel | ⏳ Not deployed yet |
+| Supabase users | ✅ Jay (trandahlmedia@gmail.com) + Dylan |
+| Anthropic API key | ✅ In .env.local + Vercel env vars |
+| Resend API key | ✅ In .env.local + Vercel env vars |
+| Resend webhook | ✅ https://kos-kohl.vercel.app/api/webhooks/resend (delivered, opened, bounced, complained) |
+| RESEND_WEBHOOK_SECRET | ✅ In .env.local + Vercel env vars |
+| CRON_SECRET | ✅ In .env.local + Vercel env vars |
+| Vercel | ✅ Deployed at kos-kohl.vercel.app — Framework: Next.js, auto-deploys from main |
+| DNS (mail) | ✅ DKIM, SPF, DMARC on mail.konvyrt.com via Namecheap + Resend |
 
 ---
 
-## PHASE 4 KICKOFF PROMPT
+## CURRENT STATE — WHERE JAY IS RIGHT NOW
 
-Paste this into Claude Code at the start of the next session:
+- 124 Duluth-area home service leads imported via CSV (plumbing, HVAC, roofing, etc.)
+- Outreach settings configured (from email, reply-to, business address, sending enabled)
+- Resend webhook live
+- AI research agent working — tested on leads
+- Email drafting working — generates initial + 3 follow-ups
+- Outreach review queue working — can edit, approve, send
+- Filters and priority sorting working on leads page
+- Call prep view with talk track, pricing split (website vs retainer), and objection handles working
+- Drag-and-drop kanban working
+- **IN PROGRESS:** Batch research (runs research on multiple leads server-side) + fix for research cancelling when closing the panel
+- **QUEUED:** Quick links bar (one-click access to lead's website/socials from detail panel)
+
+**Jay's immediate priority:** Start running research on top leads and sending outreach emails to sell websites.
 
 ---
+
+## WHAT'S NEXT TO BUILD (in priority order)
+
+### Immediate (finish current session)
+1. Confirm batch research + research cancellation fix deployed and working
+2. Run quick links prompt (saved below)
+3. Push, deploy, test
+
+### Next build phase: Personal Dashboard / Command Center
+- Today view: hot leads to call, emails to review, content needing approval, follow-ups due
+- Weekly planning: 3-5 needle-movers per week
+- Industry feed: AI-summarized articles from marketing + home services sources
+- Priority filter: Revenue/Delivery/Admin/Growth time allocation
+- This is Jay-only (not Dylan) — use profile flag or RLS
+
+### After dashboard: VA Workflow Support
+- Role layer: VA tasks vs Jay tasks
+- VA-facing simplified view
+- Approval queue for VA work
+- VA login with restricted permissions
+
+### Future: Website Builder Workstation
+- Feature spec saved at `FEATURE_WebsiteWorkstation.md`
+- Quick mockup generator for sales calls
+- Brand identity generation with reasoning
+- Template system by industry
+- Build AFTER Jay has 5-10 real sales conversations
+
+---
+
+## QUEUED PROMPT: Quick Links Bar
+
+Paste this into Claude Code after batch research is done:
 
 ```
-Read CLAUDE.md first, then read KOS_Phase4_BuildPlan.md. Do not start building until you have read both files completely.
+ultrathink
 
-We have completed Phases 1, 2, and 3. Phase 3 passed lint and build clean. Now build Phase 4 — the lead pipeline — exactly as specified in KOS_Phase4_BuildPlan.md.
+Read CLAUDE.md first, then look at these files:
+- components/leads/CallPrepView.tsx (or wherever the call prep / lead detail lives)
+- types/index.ts (Lead interface)
 
-Before writing any code, enter Plan Mode:
-1. State what you're about to build
-2. List every file you will create or modify
-3. List the migration changes needed
-4. Ask me if anything is ambiguous
+## Task: Add Quick-Access Links to Lead Detail / Call Prep
 
-Key things to know before you plan:
-- Check the existing `leads` table schema in Supabase before writing the migration — alter only what's missing, don't drop and recreate
-- Lead detail is a slide-in panel (same UX pattern as SchedulePanel in content), NOT a separate route
-- Research agent runs 5 sequential Haiku sub-agents, synthesized by a Sonnet orchestrator
-- All AI routes need rate limiting (LIMITS.USER_HEAVY) and Zod validation
-- Auth proxy is proxy.ts at root — /api routes are already excluded from the matcher
-- Use MODEL.fast (Haiku) for sub-agents — if it's not in lib/ai/claude.ts yet, add it as part of Phase 4
-- Run `npm run lint && npm run build` before declaring Phase 4 complete
-- Run /codex:review after the build passes
+When Jay is about to call a lead or is mid-call, he needs one-click access to all their online profiles without hunting for URLs.
 
-Do not build Phase 5 or 6 features. Scope is strictly what's in KOS_Phase4_BuildPlan.md.
+### Add a "Quick Links" bar near the top of the lead detail panel (visible across all tabs, not just call prep):
+
+- **Website** — opens lead.website in new tab. Show globe icon. If no website, show "No website" in muted text (this is actually a selling point on the call)
+- **Google Business** — opens lead.google_business_url in new tab. Show Google icon or map pin icon.
+- **Facebook** — opens lead.facebook_url in new tab. Show Facebook icon.
+- **Instagram** — opens instagram.com/{lead.instagram_handle} in new tab. Show Instagram icon.
+
+### Rules:
+- Only show links that exist (don't show empty/null ones)
+- Each link is a small icon button with a tooltip showing the platform name
+- Opens in new tab (target="_blank", rel="noopener noreferrer")
+- Sits in a horizontal row, compact, doesn't take up much space
+- If the research report found social URLs that aren't stored on the lead record, parse them from the research data and display them too
+- Use lucide-react icons: Globe for website, MapPin for Google, Facebook icon if available or ExternalLink as fallback
+
+### Design:
+- Horizontal icon row, subtle, near the top of the panel next to business name and phone
+- Dark aesthetic, icons in muted color that brighten on hover
+- Compact — this is a utility bar, not a feature section
+
+Run npm run lint && npm run build. After build passes, run /codex:review and auto-apply any recommendations. Then run npm run lint && npm run build again to confirm everything still passes clean.
 ```
 
 ---
 
-## BETWEEN PHASES — ALWAYS DO THIS
+## WORKFLOW FOR CLAUDE CODE SESSIONS
 
-1. Test the critical flows after each phase
-2. Come back to Cowork and report anything broken or different from plan
-3. Cowork updates the docs
-4. Then kick off the next phase
+Jay uses `ultrathink` and `ultraplan` in Claude Code terminal for planning and building. Cowork's role is:
+1. Help Jay articulate what he needs
+2. Write the prompts for Claude Code
+3. Track progress and maintain docs
+4. Pressure-test plans before building
+
+### Every Claude Code prompt must end with:
+```
+Run npm run lint && npm run build. After build passes, run /codex:review and auto-apply any recommendations. Then run npm run lint && npm run build again to confirm everything still passes clean.
+```
+
+### After every Claude Code session:
+```
+git add -A
+git commit -m "feat: [description]"
+git push
+```
+(PowerShell — run these as 3 separate commands, NOT chained with &&)
+
+Vercel auto-deploys from main after each push.
 
 ---
 
@@ -135,7 +221,23 @@ Do not build Phase 5 or 6 features. Scope is strictly what's in KOS_Phase4_Build
 - Home services industry background — don't over-explain that world.
 - Flag model choice before starting any task.
 - Confidence gate: reach 95% confidence before writing any code. Plan first, build once.
+- For business conversations: be direct, skip the fluff, give concrete next steps.
+- For personal conversations: warmer, more conversational.
 
 ---
 
-*Last updated: 2026-04-04. Phases 1–3 complete and clean. Phase 4 ready to build.*
+## SALES WORKFLOW (how Jay sells websites)
+
+1. Scrape leads from Google Maps (Instant Data Scraper) → CSV import into KOS
+2. Run AI research on top leads (prioritize no-website + high reviews)
+3. AI drafts personalized cold emails → Jay reviews and sends
+4. Hot leads (replied or 80+ score) → Jay calls using call prep view
+5. Discovery call → listen, take notes, AI summarizes
+6. Send proposal (drafted from call notes + research)
+7. Close: 50% deposit before any work begins
+8. Build website → share preview → one round of revisions → collect remaining 50% → launch
+9. Upsell monthly retainer after website trust is established
+
+---
+
+*Last updated: 2026-04-09. Phases 1–4B complete and deployed. Outreach engine live. 124 leads imported. Batch research + quick links in progress.*

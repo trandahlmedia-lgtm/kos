@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Plus, Upload } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Plus, Upload, FlaskConical, X } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -46,6 +46,85 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
   const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
+
+  // Research tracking — poll for leads with status 'running'
+  const [researchingLeadIds, setResearchingLeadIds] = useState<Set<string>>(new Set())
+  const researchPollRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    async function pollResearching() {
+      try {
+        const res = await fetch('/api/ai/lead-research/running', { signal: controller.signal })
+        if (controller.signal.aborted) return
+        if (res.ok) {
+          const data = await res.json() as { lead_ids: string[] }
+          if (!controller.signal.aborted) setResearchingLeadIds(new Set(data.lead_ids))
+        }
+      } catch {
+        if (controller.signal.aborted) return
+      }
+      if (!controller.signal.aborted) {
+        researchPollRef.current = setTimeout(pollResearching, 3000)
+      }
+    }
+    pollResearching()
+    return () => {
+      controller.abort()
+      clearTimeout(researchPollRef.current)
+    }
+  }, [])
+
+  // Batch selection state
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
+  const [batchLeadIds, setBatchLeadIds] = useState<Set<string>>(new Set())
+
+  function toggleLeadSelection(id: string) {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function selectAllLeads(leadIds: string[]) {
+    setSelectedLeadIds(new Set(leadIds))
+  }
+
+  function clearSelection() {
+    setSelectedLeadIds(new Set())
+  }
+
+  async function startBatchResearch(leadIds: string[]) {
+    clearSelection()
+    try {
+      const res = await fetch('/api/ai/lead-research/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_ids: leadIds }),
+      })
+      if (!res.ok) {
+        const err = await res.json() as { error?: string }
+        console.error('[batch-research]', err.error)
+        return
+      }
+      const data = await res.json() as { lead_ids: string[] }
+      setBatchLeadIds(new Set(data.lead_ids))
+    } catch {
+      // ignore
+    }
+  }
+
+  // Track batch completion — reload when all batch leads finish
+  useEffect(() => {
+    if (batchLeadIds.size === 0) return
+    const allDone = [...batchLeadIds].every((id) => !researchingLeadIds.has(id))
+    if (allDone) {
+      setBatchLeadIds(new Set())
+      window.location.reload()
+    }
+  }, [researchingLeadIds, batchLeadIds])
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -184,6 +263,8 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         allLeads={leads}
         filteredCount={filteredLeads.length}
         totalCount={leads.length}
+        onBatchResearch={startBatchResearch}
+        researchingCount={researchingLeadIds.size}
       />
 
       {/* View area */}
@@ -203,6 +284,7 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
                   stage={stage}
                   leads={leadsByStage[stage]}
                   onLeadClick={openLead}
+                  researchingLeadIds={researchingLeadIds}
                 />
               ))}
             </div>
@@ -221,7 +303,31 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
             leads={sortedLeads}
             onLeadClick={openLead}
             totalCount={leads.length}
+            researchingLeadIds={researchingLeadIds}
+            selectedLeadIds={selectedLeadIds}
+            onToggleSelect={toggleLeadSelection}
+            onSelectAll={selectAllLeads}
           />
+        </div>
+      )}
+
+      {/* Floating action bar for selected leads */}
+      {selectedLeadIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg shadow-black/50 px-4 py-2.5 flex items-center gap-3">
+          <span className="text-sm text-white font-medium">{selectedLeadIds.size} selected</span>
+          <Button
+            onClick={() => startBatchResearch([...selectedLeadIds])}
+            className="bg-[#E8732A] hover:bg-[#d4621f] text-white border-0 h-7 text-xs px-3"
+          >
+            <FlaskConical size={12} className="mr-1" />
+            Research Selected
+          </Button>
+          <button
+            onClick={clearSelection}
+            className="text-[#555555] hover:text-white transition-colors p-1"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 

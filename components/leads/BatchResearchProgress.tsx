@@ -35,7 +35,7 @@ interface BatchResearchProgressProps {
 
 export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelBatch }: BatchResearchProgressProps) {
   const [items, setItems] = useState<BatchItem[]>([])
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Poll for batch status — AbortController ensures stale responses are discarded
@@ -43,8 +43,15 @@ export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelB
     if (batchLeadIds.length === 0) return
     const controller = new AbortController()
     let localTimerId: number
+    let isFirstPoll = true
     const pollFn = async () => {
       if (controller.signal.aborted) return
+      // Reset state on first poll of a new batch
+      if (isFirstPoll) {
+        isFirstPoll = false
+        setItems([])
+        setOpen(true)
+      }
       try {
         const res = await fetch(
           `/api/ai/lead-research/batch-status?lead_ids=${batchLeadIds.join(',')}`,
@@ -62,6 +69,9 @@ export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelB
             onBatchComplete()
             return
           }
+        } else if (res.status === 401 || res.status === 403) {
+          // Terminal auth error - stop polling
+          return
         }
       } catch {
         if (controller.signal.aborted) return
@@ -93,7 +103,8 @@ export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelB
   const completedCount = items.filter((i) => i.status === 'completed').length
   const failedCount = items.filter((i) => i.status === 'failed').length
   const totalCount = batchLeadIds.length
-  const isRunning = items.some((i) => i.status === 'running' || i.status === 'pending')
+  // Treat as running when items haven't loaded yet (before first poll) or have active items
+  const isRunning = items.length === 0 || items.some((i) => i.status === 'running' || i.status === 'pending')
 
   return (
     <div className="relative" ref={dropdownRef}>

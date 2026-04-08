@@ -34,6 +34,8 @@ const ALL_HEAT_LEVELS: LeadHeatLevel[] = ['hot', 'good', 'maybe', 'cut']
 const ALL_STAGES: LeadStage[] = ['new', 'reached_out', 'connected', 'interested', 'proposal_sent', 'won', 'lost']
 const SORT_KEYS: SortKey[] = ['priority', 'review_count', 'rating', 'ai_score', 'newest']
 
+const BATCH_SIZES = [5, 10, 20, 50] as const
+
 interface LeadsToolbarProps {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
@@ -44,6 +46,7 @@ interface LeadsToolbarProps {
   filters: FilterState
   onFiltersChange: (f: FilterState) => void
   allLeads: Lead[]
+  filteredLeads: Lead[]
   filteredCount: number
   totalCount: number
   onBatchResearch?: (leadIds: string[]) => void
@@ -66,6 +69,7 @@ export function LeadsToolbar({
   filters,
   onFiltersChange,
   allLeads,
+  filteredLeads,
   filteredCount,
   totalCount,
   onBatchResearch,
@@ -74,6 +78,7 @@ export function LeadsToolbar({
   onCancelBatch,
 }: LeadsToolbarProps) {
   const activeFilterCount = countActiveFilters(filters)
+  const isBatchActive = (batchLeadIds?.length ?? 0) > 0
   const industries = getDistinctIndustries(allLeads)
 
   const viewBtn = (mode: ViewMode, icon: React.ReactNode) => (
@@ -296,36 +301,51 @@ export function LeadsToolbar({
           />
         )}
 
-        {/* Batch research buttons */}
+        {/* Batch research — size picker */}
         {onBatchResearch && (
           <>
             <div className="w-px h-4 bg-[#2a2a2a]" />
             <DropdownMenu>
               <DropdownMenuTrigger
-                className="inline-flex items-center gap-1.5 border border-[#2a2a2a] text-[#999999] hover:text-white h-7 text-xs px-2.5 rounded-md bg-transparent transition-colors"
+                disabled={isBatchActive}
+                className={`inline-flex items-center gap-1.5 border border-[#2a2a2a] h-7 text-xs px-2.5 rounded-md bg-transparent transition-colors ${
+                  isBatchActive ? 'text-[#333333] cursor-not-allowed' : 'text-[#999999] hover:text-white'
+                }`}
               >
                 <FlaskConical size={13} />
-                Batch Research
+                Research
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
+              <DropdownMenuContent align="end" className="w-[220px]">
+                <DropdownMenuLabel>Batch size (unresearched in view)</DropdownMenuLabel>
+                <DropdownMenuSeparator />
                 <DropdownMenuGroup>
+                  {BATCH_SIZES.map((size) => {
+                    const unresearched = filteredLeads.filter((l) => l.ai_score === null)
+                    const available = Math.min(size, unresearched.length)
+                    return (
+                      <DropdownMenuItem
+                        key={size}
+                        disabled={available === 0}
+                        onClick={() => {
+                          const ids = unresearched.slice(0, size).map((l) => l.id)
+                          if (ids.length > 0) onBatchResearch(ids)
+                        }}
+                      >
+                        <FlaskConical size={13} className="mr-2" />
+                        Research Top {size} ({available})
+                      </DropdownMenuItem>
+                    )
+                  })}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    disabled={filteredLeads.filter((l) => l.ai_score === null).length === 0}
                     onClick={() => {
-                      const newLeads = allLeads.filter((l) => l.stage === 'new' && l.ai_score === null)
-                      if (newLeads.length > 0) onBatchResearch(newLeads.map((l) => l.id))
+                      const ids = filteredLeads.filter((l) => l.ai_score === null).map((l) => l.id)
+                      if (ids.length > 0) onBatchResearch(ids)
                     }}
                   >
                     <FlaskConical size={13} className="mr-2" />
-                    Research All New ({allLeads.filter((l) => l.stage === 'new' && l.ai_score === null).length})
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const unresearched = allLeads.filter((l) => l.ai_score === null).slice(0, 20)
-                      if (unresearched.length > 0) onBatchResearch(unresearched.map((l) => l.id))
-                    }}
-                  >
-                    <FlaskConical size={13} className="mr-2" />
-                    Research Top 20 ({Math.min(20, allLeads.filter((l) => l.ai_score === null).length)})
+                    Research All ({filteredLeads.filter((l) => l.ai_score === null).length})
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>

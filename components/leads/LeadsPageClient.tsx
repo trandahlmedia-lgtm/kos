@@ -60,6 +60,9 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         if (res.ok) {
           const data = await res.json() as { lead_ids: string[] }
           if (!controller.signal.aborted) setResearchingLeadIds(new Set(data.lead_ids))
+        } else if (res.status === 401 || res.status === 403) {
+          // Terminal auth error — stop polling
+          return
         }
       } catch {
         if (controller.signal.aborted) return
@@ -104,6 +107,10 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
   }, [])
 
   async function startBatchResearch(leadIds: string[]) {
+    // If a batch is already running, cancel it first before starting a new one
+    if (batchLeadIds.size > 0) {
+      await cancelBatchResearch()
+    }
     batchAbortRef.current?.abort()
     clearSelection()
     try {
@@ -304,6 +311,7 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         filters={filters}
         onFiltersChange={setFilters}
         allLeads={leads}
+        filteredLeads={filteredLeads}
         filteredCount={filteredLeads.length}
         totalCount={leads.length}
         onBatchResearch={startBatchResearch}

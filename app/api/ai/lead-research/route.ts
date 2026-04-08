@@ -209,8 +209,16 @@ export async function POST(request: Request) {
           pricingAnalysis,
         })
 
-        const aiRecommendedTier = (pricingAnalysis.recommended_tier as string) ?? 'starter'
-        const aiRecommendedMrr = (pricingAnalysis.mrr_low as number) ?? 0
+        // Extract tier info — support both new (website_tier/retainer_tier) and old (recommended_tier) formats
+        const websiteTier = pricingAnalysis.website_tier as Record<string, unknown> | undefined
+        const retainerTier = pricingAnalysis.retainer_tier as Record<string, unknown> | undefined
+        const aiRecommendedTier = (websiteTier?.tier_name as string)
+          ?? (pricingAnalysis.recommended_bundle as string)
+          ?? (pricingAnalysis.recommended_tier as string)
+          ?? 'starter'
+        const aiRecommendedMrr = (retainerTier?.monthly_low as number)
+          ?? (pricingAnalysis.mrr_low as number)
+          ?? 0
 
         // Save to DB
         const researchFields = {

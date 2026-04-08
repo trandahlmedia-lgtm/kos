@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Phone, Copy, Check, Flame, Globe, Star, MapPin, Target } from 'lucide-react'
+import { Phone, Copy, Check, Flame, Globe, Star, MapPin, Monitor, Repeat } from 'lucide-react'
 import type { Lead, LeadResearch } from '@/types'
 import { scoreColor } from './leadsUtils'
 
@@ -14,10 +14,26 @@ interface CallPrepTabProps {
 // Parse existing research into call-prep structure
 // ---------------------------------------------------------------------------
 
+interface WebsitePitch {
+  tierName: string
+  priceRange: string
+  rationale: string
+  includes: string
+  closeLine: string
+}
+
+interface RetainerPitch {
+  tierName: string
+  priceRange: string
+  rationale: string
+  includes: string
+}
+
 interface CallPrepData {
   opener: string
   situation: string[]
-  pitch: { services: string; tier: string; price: string } | null
+  websitePitch: WebsitePitch | null
+  retainerPitch: RetainerPitch | null
   objections: string[]
   goal: string
 }
@@ -26,7 +42,8 @@ function buildCallPrep(lead: Lead, research: LeadResearch | null): CallPrepData 
   const situation: string[] = []
   const objections: string[] = []
   let opener = ''
-  let pitch: CallPrepData['pitch'] = null
+  let websitePitch: WebsitePitch | null = null
+  let retainerPitch: RetainerPitch | null = null
   let goal = 'Book a follow-up call or send a proposal'
 
   // Build opener from lead data
@@ -49,7 +66,6 @@ function buildCallPrep(lead: Lead, research: LeadResearch | null): CallPrepData 
     const websiteAudit = research.website_audit as Record<string, unknown> | null
     const socialAudit = research.social_audit as Record<string, unknown> | null
     const businessIntel = research.business_intel as Record<string, unknown> | null
-    const serviceFit = research.service_fit as Record<string, unknown> | null
     const pricingAnalysis = research.pricing_analysis as Record<string, unknown> | null
 
     // Website situation
@@ -77,40 +93,65 @@ function buildCallPrep(lead: Lead, research: LeadResearch | null): CallPrepData 
       situation.push(`${lead.review_count} Google reviews (${rating ?? '?'}★) — strong reputation to leverage`)
     }
 
-    // Service fit → pitch
-    if (serviceFit) {
-      const services = serviceFit.services as Array<{ name: string; priority: string }> | undefined
-      const highPriority = services?.filter((s) => s.priority === 'high').map((s) => s.name) ?? []
-      const serviceList = highPriority.length > 0
-        ? highPriority.join(', ')
-        : services?.map((s) => s.name).slice(0, 3).join(', ') ?? ''
+    // Build website pitch from new-format pricing_analysis
+    const wt = pricingAnalysis?.website_tier as Record<string, unknown> | undefined
+    const rt = pricingAnalysis?.retainer_tier as Record<string, unknown> | undefined
 
-      if (pricingAnalysis) {
-        const tier = String(pricingAnalysis.recommended_tier ?? '').replace(/_/g, ' ')
-        const low = pricingAnalysis.mrr_low
-        const high = pricingAnalysis.mrr_high
-        pitch = {
-          services: serviceList || 'Full-service marketing',
-          tier: tier || 'custom',
-          price: low && high ? `$${low}–$${high}/mo` : 'Custom pricing',
-        }
-      } else if (serviceList) {
-        pitch = { services: serviceList, tier: '', price: '' }
+    if (wt?.tier_name) {
+      const tierLabel = String(wt.tier_name).replace(/_/g, ' ')
+      const low = wt.price_low as number | undefined
+      const high = wt.price_high as number | undefined
+      websitePitch = {
+        tierName: tierLabel,
+        priceRange: low && high ? (low === high ? `$${low}` : `$${low}\u2013$${high}`) : 'Custom',
+        rationale: (wt.rationale as string) ?? '',
+        includes: (wt.includes as string) ?? '',
+        closeLine: noWebsite
+          ? `I can have a custom ${tierLabel} site live for you in 2\u20133 weeks \u2014 want me to send over what that looks like?`
+          : `Your current site is leaving leads on the table \u2014 a ${tierLabel} rebuild would fix that. Want me to scope it out?`,
+      }
+    } else if (noWebsite) {
+      // Fallback: no structured pricing data, but lead has no website
+      websitePitch = {
+        tierName: 'standard',
+        priceRange: '$1,500',
+        rationale: 'No website \u2014 standard build covers most home service businesses.',
+        includes: '5\u20137 pages, service sub-pages, booking integration, contact form, SEO basics',
+        closeLine: 'I can have a site live for you in 2\u20133 weeks \u2014 want me to send over what that looks like?',
       }
     }
 
-    // Pricing from lead-level fields as fallback
-    if (!pitch && lead.ai_recommended_tier) {
-      pitch = {
-        services: 'Based on AI research',
-        tier: lead.ai_recommended_tier.replace(/_/g, ' '),
-        price: lead.ai_recommended_mrr ? `~$${lead.ai_recommended_mrr}/mo` : '',
+    if (rt?.tier_name) {
+      const tierLabel = String(rt.tier_name).replace(/_/g, ' ')
+      const low = rt.monthly_low as number | undefined
+      const high = rt.monthly_high as number | undefined
+      retainerPitch = {
+        tierName: tierLabel,
+        priceRange: low && high ? (low === high ? `$${low}/mo` : `$${low}\u2013$${high}/mo`) : 'Custom',
+        rationale: (rt.rationale as string) ?? '',
+        includes: (rt.includes as string) ?? '',
+      }
+    } else if (pricingAnalysis) {
+      // Old format fallback: single recommended_tier + mrr range
+      const oldTier = String(pricingAnalysis.recommended_tier ?? '').replace(/_/g, ' ')
+      const oldLow = pricingAnalysis.mrr_low as number | undefined
+      const oldHigh = pricingAnalysis.mrr_high as number | undefined
+      if (oldTier || oldLow) {
+        retainerPitch = {
+          tierName: oldTier || 'basic',
+          priceRange: oldLow && oldHigh ? `$${oldLow}\u2013$${oldHigh}/mo` : '',
+          rationale: (pricingAnalysis.rationale as string) ?? '',
+          includes: '',
+        }
       }
     }
 
     // Objections from pricing analysis
     if (pricingAnalysis?.negotiation_notes) {
       objections.push(String(pricingAnalysis.negotiation_notes))
+    }
+    if (pricingAnalysis?.build_fee_note) {
+      objections.push(`Build fee flexibility: ${String(pricingAnalysis.build_fee_note)}`)
     }
 
     // Generic objections based on business type
@@ -144,7 +185,7 @@ function buildCallPrep(lead: Lead, research: LeadResearch | null): CallPrepData 
     objections.push('\u201cI\u2019m not interested\u201d \u2192 Totally fair. Just wanted to see if getting more leads online was on your radar. If not now, happy to follow up later.')
   }
 
-  return { opener, situation, pitch, objections: objections.slice(0, 3), goal }
+  return { opener, situation, websitePitch, retainerPitch, objections: objections.slice(0, 3), goal }
 }
 
 // ---------------------------------------------------------------------------
@@ -236,22 +277,49 @@ export function CallPrepTab({ lead, research }: CallPrepTabProps) {
         </ul>
       </PrepCard>
 
-      {/* What to pitch */}
-      {prep.pitch && (
-        <PrepCard title="What to Pitch">
-          <div className="flex flex-wrap items-center gap-2">
-            <Target size={12} className="text-[#E8732A]" />
-            <span className="text-sm text-white">{prep.pitch.services}</span>
+      {/* The Website Sale — primary card */}
+      {prep.websitePitch && (
+        <div className="rounded-md p-3 space-y-2.5 bg-[#E8732A]/5 border border-[#E8732A]/20">
+          <div className="flex items-center gap-2">
+            <Monitor size={13} className="text-[#E8732A]" />
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[#E8732A]">The Website Sale</span>
+            <span className="text-[9px] text-[#E8732A]/60 ml-auto">ONE-TIME</span>
           </div>
-          <div className="flex items-center gap-3 mt-1.5 text-xs">
-            {prep.pitch.tier && (
-              <span className="text-[#E8732A] capitalize">{prep.pitch.tier} tier</span>
-            )}
-            {prep.pitch.price && (
-              <span className="text-[#999999]">{prep.pitch.price}</span>
-            )}
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-white capitalize">{prep.websitePitch.tierName}</span>
+            <span className="text-sm font-semibold text-[#E8732A]">{prep.websitePitch.priceRange}</span>
           </div>
-        </PrepCard>
+          {prep.websitePitch.rationale && (
+            <p className="text-xs text-[#999999]">{prep.websitePitch.rationale}</p>
+          )}
+          {prep.websitePitch.includes && (
+            <p className="text-[11px] text-[#555555]">Includes: {prep.websitePitch.includes}</p>
+          )}
+          <div className="pt-1.5 border-t border-[#E8732A]/10">
+            <p className="text-xs text-white italic">&ldquo;{prep.websitePitch.closeLine}&rdquo;</p>
+          </div>
+        </div>
+      )}
+
+      {/* The Monthly Retainer — secondary card */}
+      {prep.retainerPitch && (
+        <div className="rounded-md p-3 space-y-2.5 bg-[#111111] border border-[#2a2a2a]">
+          <div className="flex items-center gap-2">
+            <Repeat size={13} className="text-[#555555]" />
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[#555555]">The Monthly Retainer</span>
+            <span className="text-[9px] text-[#555555]/60 ml-auto">PITCH AFTER WEBSITE</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-medium text-[#999999] capitalize">{prep.retainerPitch.tierName}</span>
+            <span className="text-sm font-medium text-[#999999]">{prep.retainerPitch.priceRange}</span>
+          </div>
+          {prep.retainerPitch.rationale && (
+            <p className="text-xs text-[#555555]">{prep.retainerPitch.rationale}</p>
+          )}
+          {prep.retainerPitch.includes && (
+            <p className="text-[11px] text-[#555555]">Includes: {prep.retainerPitch.includes}</p>
+          )}
+        </div>
       )}
 
       {/* Objection handles */}

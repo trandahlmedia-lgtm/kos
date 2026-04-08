@@ -203,31 +203,32 @@ Return ONLY this JSON, no other text:
 
 export const PRICING_RECOMMENDER_SYSTEM = `You are a pricing strategist for Konvyrt Marketing.
 
-Konvyrt's actual pricing:
+IMPORTANT: Jay sells websites FIRST as a one-time project, THEN pitches monthly retainer services after trust is built. These are two separate sales conversations. You must recommend both tiers independently.
+
+Konvyrt's EXACT pricing (do not make up numbers):
 
 WEBSITES (one-time build fee):
-- Basic: $1,000 — 3-4 pages, clean design, mobile-optimized
-- Standard: $1,500 — 5-7 pages, more dialed content, basic integrations
-- Full Build: $2,000-$2,500 — custom design, full brand alignment, booking integrations, SEO-ready
+- Basic: $1,000 — 3-4 pages (Homepage, Services, Contact). Clean design, mobile-optimized, no custom integrations.
+- Standard: $1,500 — 5-7 pages, pricing pages, service sub-pages, basic integrations (booking link, contact form).
+- Full Build: $2,000-$2,500 — Custom design from scratch, full brand alignment, multiple service pages, booking integrations, contact API, SEO-ready, fully wireframed to convert.
+- Every build includes: research, wireframe, design, development, mobile responsiveness, contact form, basic SEO structure.
+- Build fee can be spread across first 3 months of a retainer ($333-$833/mo added).
 
-SOCIAL MEDIA MANAGEMENT (monthly retainer):
-- Basic: $750/mo — 2 static posts/week, Reels editing, scheduling, monthly analytics
-- Full Service: $2,500-$3,500/mo — brand kit, monthly filming, scripted content, strategy, platform expansion, ongoing consulting
+SOCIAL MEDIA / MONTHLY RETAINER:
+- Basic: $750/mo — 2 static posts/week, Reels editing from client footage, captions, scheduling, monthly analytics. Does NOT include filming, brand kit, or ads.
+- Full Service: $2,500-$3,500/mo — Everything in Basic PLUS brand kit, monthly filming session, scripted content, platform expansion, strategy, ongoing consulting, analytics with context. Reference: Northern Standard at $3,000/mo.
 
 ADD-ONS:
 - Brand Kit: $400-$800 (included in Full Service and Full Build websites)
 - Content Filming: $400-$600/half-day, $800-$1,200/full-day (included in Full Service retainer)
-- Paid Ads: 5-10% of attributed revenue, $20/day minimum ad spend
+- Paid Ads: 5-10% of attributed revenue, $20/day min spend — only after 2-3 months of organic presence
 
 BUNDLES:
-- Starter: ~$1,750/mo — Basic website + Basic social (build fee spread over 3 months)
+- Starter: ~$1,750/mo — Basic website + Basic social (build spread over 3 months)
 - Growth: $3,000-$3,500/mo — Standard website + Full Service social
-- Full Stack: Custom — Full Build website + Full Service social + Ads management
+- Full Stack: Custom — Full Build + Full Service + Ads
 
-Build fees can be structured into the first 3 months of a retainer.
-Reference client: Northern Standard Heating & Air at $3,000/mo Full Service tier.
-
-Recommend the right tier and MRR range based on the lead data. Be realistic — not every lead is a Full Service client.`
+Be realistic. Not every lead needs Full Build or Full Service. Match the tier to their actual business size and needs.`
 
 export function buildPricingRecommenderPrompt(params: {
   businessName: string
@@ -245,15 +246,28 @@ Social Audit: ${JSON.stringify(socialAudit)}
 Business Intelligence: ${JSON.stringify(businessIntel)}
 Service Fit: ${JSON.stringify(serviceFit)}
 
-Recommend the right Konvyrt pricing tier for this lead.
+Recommend BOTH a website tier AND a retainer tier for this lead, as two separate sales.
+If the lead already has a good website, the website_tier can still recommend improvements or a rebuild — use your judgment.
 
 Return ONLY this JSON, no other text:
 {
-  "recommended_tier": "<starter|growth|full_service|full_stack>",
-  "mrr_low": <integer — low end of monthly retainer in dollars>,
-  "mrr_high": <integer — high end of monthly retainer in dollars>,
-  "rationale": "<2-3 sentences explaining the recommendation>",
-  "negotiation_notes": "<any notes on pricing sensitivity, objections to anticipate, or upsell path>"
+  "website_tier": {
+    "tier_name": "<basic|standard|full_build>",
+    "price_low": <integer — e.g. 1000>,
+    "price_high": <integer — e.g. 1000 for Basic, 2500 for Full Build>,
+    "rationale": "<one sentence why this tier fits their business>",
+    "includes": "<what they get — e.g. '5-7 pages, booking integration, service sub-pages'>"
+  },
+  "retainer_tier": {
+    "tier_name": "<basic|full_service>",
+    "monthly_low": <integer — e.g. 750>,
+    "monthly_high": <integer — e.g. 750 for Basic, 3500 for Full Service>,
+    "rationale": "<one sentence why — tied to their specific social/marketing gaps>",
+    "includes": "<what they get — e.g. '2 posts/week, Reels editing, scheduling'>"
+  },
+  "recommended_bundle": "<starter|growth|full_stack>",
+  "negotiation_notes": "<pricing sensitivity, objections to expect, or upsell path>",
+  "build_fee_note": "<suggest spreading build fee into retainer if appropriate, e.g. '$500/mo for 3 months'>"
 }`
 }
 
@@ -287,6 +301,8 @@ Business Intelligence: ${JSON.stringify(businessIntel)}
 Service Fit: ${JSON.stringify(serviceFit)}
 Pricing Analysis: ${JSON.stringify(pricingAnalysis)}
 
+IMPORTANT: Jay sells websites FIRST (one-time project), then pitches monthly retainer AFTER trust is built. Structure the recommendation accordingly.
+
 Write a markdown report with these sections:
 
 ## Executive Summary
@@ -301,9 +317,14 @@ Size, revenue estimate, growth stage, competitive position.
 ## Opportunity for Konvyrt
 What services are the best fit? What's the primary opportunity? What are quick wins we can pitch?
 
+## The Website Sale (Pitch First)
+Website tier recommendation, price, what it includes, and why it fits. This is the door-opener.
+
+## The Monthly Retainer (Pitch After Website)
+Retainer tier, monthly price range, what it includes, and what gaps it fills. This is the long-term revenue play.
+
 ## Recommended Approach
-Tier: [tier name] | MRR: $[low]–$[high]/mo
-How should Jay/Dylan approach this pitch? What pain points to lead with? Any objections to prepare for?
+How should Jay approach this pitch? What pain points to lead with? Any objections to prepare for? Should the build fee be spread into the retainer?
 
 ## Score Breakdown
 - Online Presence (40%): X/40

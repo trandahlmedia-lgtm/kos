@@ -10,6 +10,7 @@ import { LeadResearchTab } from './LeadResearchTab'
 import { LeadNotesTab } from './LeadNotesTab'
 import { CallPrepTab } from './CallPrepTab'
 import { ConvertLeadDialog } from './ConvertLeadDialog'
+import { QuickLinks } from './QuickLinks'
 import type { Lead, LeadResearch, LeadActivity, LeadStage } from '@/types'
 
 interface LeadDetailData {
@@ -36,45 +37,62 @@ export function LeadDetailPanel({
 }: LeadDetailPanelProps) {
   const [data, setData] = useState<LeadDetailData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showConvert, setShowConvert] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     if (!leadId) return
     setLoading(true)
+    setLoadError(null)
     try {
-      const res = await fetch(`/api/leads/${leadId}`)
-      if (!res.ok) return
+      const res = await fetch(`/api/leads/${leadId}`, { signal })
+      if (!res.ok) {
+        setLoadError('Failed to load lead details')
+        return
+      }
       const json = await res.json() as LeadDetailData
       setData(json)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setLoadError('Failed to load lead details')
     } finally {
       setLoading(false)
     }
   }, [leadId])
 
   useEffect(() => {
-    if (open && leadId) fetchData()
-    if (!open) setData(null)
+    if (open && leadId) {
+      const controller = new AbortController()
+      fetchData(controller.signal)
+      return () => controller.abort()
+    }
+    if (!open) {
+      setData(null)
+      setLoadError(null)
+    }
   }, [open, leadId, fetchData])
 
   async function handleUpdate(updates: Partial<Lead>) {
     if (!leadId) return
-    await fetch(`/api/leads/${leadId}`, {
+    const res = await fetch(`/api/leads/${leadId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     })
+    if (!res.ok) return
     await fetchData()
     if (data?.lead) onLeadUpdated({ ...data.lead, ...updates })
   }
 
   async function handleStageChange(stage: LeadStage, lostReason?: string) {
     if (!leadId) return
-    await fetch(`/api/leads/${leadId}/stage`, {
+    const res = await fetch(`/api/leads/${leadId}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stage, lost_reason: lostReason }),
     })
+    if (!res.ok) return
     await fetchData()
     if (data?.lead) onLeadUpdated({ ...data.lead, stage })
   }
@@ -83,10 +101,17 @@ export function LeadDetailPanel({
     if (!leadId || !data?.lead) return
     if (!confirm(`Delete ${data.lead.business_name}? This cannot be undone.`)) return
     setDeleting(true)
-    await fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
-    onLeadDeleted(leadId)
-    onClose()
-    setDeleting(false)
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        setDeleting(false)
+        return
+      }
+      onLeadDeleted(leadId)
+      onClose()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const lead = data?.lead
@@ -99,9 +124,25 @@ export function LeadDetailPanel({
           side="right"
           className="bg-[#111111] border-l border-[#2a2a2a] w-[480px] sm:w-[520px] p-0 flex flex-col"
         >
-          {loading || !lead ? (
-            <div className="flex items-center justify-center flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center flex-1" role="status" aria-label="Loading lead details">
               <div className="w-5 h-5 border-2 border-[#E8732A] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center flex-1 gap-2 text-center px-6" role="alert">
+              <p className="text-sm text-red-400">{loadError}</p>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => fetchData()}
+                className="text-xs text-[#999999] hover:text-white"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : !lead ? (
+            <div className="flex items-center justify-center flex-1">
+              <p className="text-sm text-[#555555]">No lead selected</p>
             </div>
           ) : (
             <>
@@ -124,15 +165,19 @@ export function LeadDetailPanel({
                       variant="ghost"
                       onClick={handleDelete}
                       disabled={deleting}
+                      aria-label={`Delete ${lead.business_name}`}
                       className="h-7 w-7 p-0 text-[#555555] hover:text-red-400"
                     >
                       <Trash2 size={14} />
                     </Button>
                   </div>
                 </div>
-                {lead.industry && (
-                  <p className="text-xs text-[#555555] mt-0.5">{lead.industry}{lead.service_area ? ` · ${lead.service_area}` : ''}</p>
-                )}
+                <div className="flex items-center gap-2 mt-1">
+                  {lead.industry && (
+                    <p className="text-xs text-[#555555]">{lead.industry}{lead.service_area ? ` · ${lead.service_area}` : ''}</p>
+                  )}
+                  <QuickLinks lead={lead} research={data?.research ?? null} />
+                </div>
               </SheetHeader>
 
               <Tabs defaultValue="overview" className="flex flex-col flex-1 overflow-hidden">

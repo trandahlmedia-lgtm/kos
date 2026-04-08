@@ -76,6 +76,9 @@ Text muted:       #555555
 | 4-UX3 | Call prep pricing split — website sale (one-time) vs retainer (monthly) as separate cards | ✅ Complete |
 | 4-UX4 | Batch research + research cancellation fix — research runs server-side, batch "Research Top 20" button, progress tracking | ✅ Complete |
 | 4-UX4b | Sequential research queue + progress dropdown — research runs one lead at a time, top-right loading indicator expands to show full queue, active lead shows step-by-step checklist progress | ✅ Complete |
+| 4-UX4c | Codex review fixes — batch queue durability (removed after(), client-driven queue), stable array prop, over-fetch fix, step completion accuracy, stale recovery | ✅ Complete |
+| 4-UX4d | Cancel/reset stuck research — cancel batch button, reset stuck leads, configurable batch size (5/10/20/50/All) | ✅ Complete |
+| 4-UX4e | Base UI error fix — leads page crash fix | ✅ Complete |
 | 4-UX5 | Quick links bar — one-click access to lead's website, Google Business, Facebook, Instagram from detail panel | 📋 Queued (prompt ready) |
 | 4-UX6 | Disqualify/remove dead lead — mark lead as disqualified, auto-unsubscribe from outreach, remove from active pipeline (keep record to prevent re-import) | 📋 Queued (needs prompt) |
 | 5 | Personal Dashboard / Command Center — today view, weekly planning, industry feed, priority filter | Pending |
@@ -100,7 +103,7 @@ Text muted:       #555555
 | RESEND_WEBHOOK_SECRET | ✅ In .env.local + Vercel env vars |
 | CRON_SECRET | ✅ In .env.local + Vercel env vars |
 | Vercel | ✅ Deployed at kos-kohl.vercel.app — Framework: Next.js, auto-deploys from main |
-| DNS (mail) | ✅ DKIM, SPF, DMARC on mail.konvyrt.com via Namecheap + Resend |
+| DNS (mail) | ⚠️ DKIM, SPF on mail.konvyrt.com via Namecheap + Resend — MX record re-added 4/8, re-verifying |
 
 ---
 
@@ -109,27 +112,32 @@ Text muted:       #555555
 - 124 Duluth-area home service leads imported via CSV (plumbing, HVAC, roofing, etc.)
 - Outreach settings configured (from email, reply-to, business address, sending enabled)
 - Resend webhook live
-- AI research agent working — tested on leads
-- Email drafting working — generates initial + 3 follow-ups
-- Outreach review queue working — can edit, approve, send
+- AI research agent working — tested on leads, batch research runs sequentially with progress dropdown
+- Batch research: configurable batch size (5/10/20/50/All), cancel button, reset stuck leads
+- Email drafting working — generates initial + 3 follow-ups, personalized with research data
+- Email sending: working via Resend, test email delivered but landed in spam (new domain warmup needed)
+- Outreach review queue working — approve then send flow
 - Filters and priority sorting working on leads page
 - Call prep view with talk track, pricing split (website vs retainer), and objection handles working
 - Drag-and-drop kanban working
-- **QUEUED:** Quick links bar (one-click access to lead's website/socials from detail panel) — prompt ready, run next
-- **QUEUED:** Disqualify/remove dead lead — needs prompt written
-- Batch research is working sequentially with progress dropdown
+- Sales rep guide PDF created for Nick Swanson (25% commission closer) — `C:\HQ\Konvyrt_SalesRep_Guide.pdf`
+- **QUEUED:** Quick links bar (4-UX5) — prompt ready
+- **QUEUED:** Disqualify/remove dead lead (4-UX6) — needs prompt
+- **ISSUE:** mail.konvyrt.com MX record was missing, re-added 4/8 — check Resend to confirm verification passed
 
-**Jay's immediate priority:** Start running research on top leads and sending outreach emails to sell websites.
+**Jay's immediate priority:** Confirm Resend domain verification, start sending outreach emails, and get on the phone to sell websites. Nick Swanson onboarded as commission-based caller.
 
 ---
 
 ## WHAT'S NEXT TO BUILD (in priority order)
 
 ### Immediate (next session)
-1. Deploy and test sequential queue + progress dropdown (just pushed)
-2. Run quick links prompt (4-UX5) — saved below
-3. Write and run disqualify lead prompt (4-UX6)
-4. Push, deploy, test each
+1. Confirm Resend domain verification passed (MX record re-added 4/8) — if still failing, debug DNS
+2. Test email send — confirm it delivers to inbox (not just spam)
+3. Run quick links prompt (4-UX5) — saved below
+4. Write and run disqualify lead prompt (4-UX6)
+5. Push, deploy, test each
+6. Start real outreach — research top leads, send emails, follow up
 
 ### Next build phase: Personal Dashboard / Command Center
 - Today view: hot leads to call, emails to review, content needing approval, follow-ups due
@@ -143,6 +151,13 @@ Text muted:       #555555
 - VA-facing simplified view
 - Approval queue for VA work
 - VA login with restricted permissions
+
+### UX Improvements Backlog (logged 4/8)
+- **Individual research progress** — single-lead research doesn't show in the batch progress tracker. Make it appear there too so Jay always has visibility.
+- **Delete approved email drafts** — ability to remove/delete an email draft even after approving it (for test runs or mistakes)
+- **Real-time UI updates** — research results and email drafts require a page refresh to appear. Add real-time polling or Supabase Realtime subscriptions so the page auto-updates without manual refresh.
+- **Bulk email approve + send** — in outreach, add "Approve All" for a specific lead's drafted emails, and a "Send All Drafts" button to push everything that's been drafted at once.
+- **Email send timing** — investigate and document: after approving an email, how long until it actually sends? Is there a queue/delay? If so, make the timing visible to Jay or add an option to send immediately.
 
 ### Future: Website Builder Workstation
 - Feature spec saved at `FEATURE_WebsiteWorkstation.md`
@@ -244,4 +259,4 @@ Vercel auto-deploys from main after each push.
 
 ---
 
-*Last updated: 2026-04-08. Phases 1–4B + 4-UX1 through 4-UX4b complete and deployed. Sequential research queue + progress dropdown just pushed. Quick links (4-UX5) and disqualify lead (4-UX6) queued next. 124 Duluth leads imported. Ready to start sending outreach.*
+*Last updated: 2026-04-08. Phases 1–4B + 4-UX1 through 4-UX4e complete and deployed. Batch research working sequentially with progress dropdown, configurable size, cancel/reset. Email engine working — Resend domain re-verifying after MX record fix. Sales rep guide created for Nick Swanson. Quick links (4-UX5) and disqualify lead (4-UX6) queued next. 124 Duluth leads imported.*

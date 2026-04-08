@@ -316,9 +316,9 @@ export function LeadsToolbar({
                 Research
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[220px]">
-                <DropdownMenuLabel>Batch size (unresearched in view)</DropdownMenuLabel>
-                <DropdownMenuSeparator />
                 <DropdownMenuGroup>
+                  <DropdownMenuLabel>Batch size (unresearched in view)</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   {BATCH_SIZES.map((size) => {
                     const unresearched = filteredLeads.filter((l) => l.ai_score === null)
                     const available = Math.min(size, unresearched.length)

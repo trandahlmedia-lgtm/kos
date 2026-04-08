@@ -27,6 +27,16 @@ export async function runResearchPipeline(
 ): Promise<void> {
   const startedAt = Date.now()
 
+  // Helper: check if this research row is still running (not cancelled/failed)
+  async function isStillRunning(): Promise<boolean> {
+    const { data } = await supabase
+      .from('lead_research')
+      .select('status')
+      .eq('lead_id', leadId)
+      .single()
+    return data?.status === 'running'
+  }
+
   try {
     // ── Sub-agent 1: Website Auditor ──────────────────────────────────
     let websiteContent = ''
@@ -48,7 +58,9 @@ export async function runResearchPipeline(
     await supabase.from('lead_research').update({
       website_audit: websiteAudit,
       updated_at: new Date().toISOString(),
-    }).eq('lead_id', leadId)
+    }).eq('lead_id', leadId).eq('status', 'running')
+
+    if (!await isStillRunning()) return
 
     // ── Sub-agent 2: Social Auditor ───────────────────────────────────
     const saResult = await callClaude({
@@ -68,7 +80,9 @@ export async function runResearchPipeline(
     await supabase.from('lead_research').update({
       social_audit: socialAudit,
       updated_at: new Date().toISOString(),
-    }).eq('lead_id', leadId)
+    }).eq('lead_id', leadId).eq('status', 'running')
+
+    if (!await isStillRunning()) return
 
     // ── Sub-agent 3: Business Intelligence ────────────────────────────
     const biResult = await callClaude({
@@ -92,7 +106,9 @@ export async function runResearchPipeline(
     await supabase.from('lead_research').update({
       business_intel: businessIntel,
       updated_at: new Date().toISOString(),
-    }).eq('lead_id', leadId)
+    }).eq('lead_id', leadId).eq('status', 'running')
+
+    if (!await isStillRunning()) return
 
     // ── Sub-agent 4: Service Fit ──────────────────────────────────────
     const sfResult = await callClaude({
@@ -112,7 +128,9 @@ export async function runResearchPipeline(
     await supabase.from('lead_research').update({
       service_fit: serviceFit,
       updated_at: new Date().toISOString(),
-    }).eq('lead_id', leadId)
+    }).eq('lead_id', leadId).eq('status', 'running')
+
+    if (!await isStillRunning()) return
 
     // ── Sub-agent 5: Pricing Recommender ─────────────────────────────
     const prResult = await callClaude({
@@ -133,7 +151,9 @@ export async function runResearchPipeline(
     await supabase.from('lead_research').update({
       pricing_analysis: pricingAnalysis,
       updated_at: new Date().toISOString(),
-    }).eq('lead_id', leadId)
+    }).eq('lead_id', leadId).eq('status', 'running')
+
+    if (!await isStillRunning()) return
 
     // ── Orchestrator: Synthesis ───────────────────────────────────────
     const orchResult = await callClaude({
@@ -170,14 +190,17 @@ export async function runResearchPipeline(
       ?? (pricingAnalysis.mrr_low as number)
       ?? 0
 
-    // Save final results
-    await supabase.from('lead_research').update({
+    // Save final results — only if still running (not cancelled)
+    const { data: finalUpdate } = await supabase.from('lead_research').update({
       full_report: fullReport,
       overall_score: overallScore,
       status: 'completed',
       error_message: null,
       updated_at: new Date().toISOString(),
-    }).eq('lead_id', leadId)
+    }).eq('lead_id', leadId).eq('status', 'running').select('id').single()
+
+    // If the row was cancelled mid-pipeline, don't update the lead
+    if (!finalUpdate) return
 
     // Update lead
     await supabase.from('leads').update({

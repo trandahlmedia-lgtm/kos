@@ -49,6 +49,7 @@ interface LeadsToolbarProps {
   onBatchResearch?: (leadIds: string[]) => void
   batchLeadIds?: string[]
   onBatchComplete?: () => void
+  onCancelBatch?: () => void
 }
 
 function toggleInArray<T>(arr: T[], value: T): T[] {
@@ -70,6 +71,7 @@ export function LeadsToolbar({
   onBatchResearch,
   batchLeadIds,
   onBatchComplete,
+  onCancelBatch,
 }: LeadsToolbarProps) {
   const activeFilterCount = countActiveFilters(filters)
   const industries = getDistinctIndustries(allLeads)
@@ -290,6 +292,7 @@ export function LeadsToolbar({
           <BatchResearchProgress
             batchLeadIds={batchLeadIds!}
             onBatchComplete={onBatchComplete}
+            onCancelBatch={onCancelBatch}
           />
         )}
 

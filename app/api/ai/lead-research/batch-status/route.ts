@@ -35,8 +35,8 @@ export async function GET(request: Request) {
     .select('lead_id, status, error_message, overall_score, updated_at, website_audit, social_audit, business_intel, service_fit, pricing_analysis')
     .in('lead_id', leadIds)
 
-  // Recover stale leads: if pending/running for >10 min, mark failed
-  const STALE_MS = 10 * 60 * 1000
+  // Recover stale leads: if pending/running for >5 min, mark failed
+  const STALE_MS = 5 * 60 * 1000
   const now = Date.now()
   for (const row of researchRows ?? []) {
     if ((row.status === 'pending' || row.status === 'running') && row.updated_at) {

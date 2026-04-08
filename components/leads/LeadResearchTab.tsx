@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { FlaskConical, RefreshCw, AlertCircle } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { FlaskConical, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ResearchProgress } from './ResearchProgress'
 import { GenerateDraftsButton } from '@/components/outreach/GenerateDraftsButton'
@@ -23,6 +23,41 @@ export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExist
   const [running, setRunning] = useState(alreadyRunning)
   const [pollOnly, setPollOnly] = useState(alreadyRunning)
   const [error, setError] = useState<string | null>(null)
+  const [resetting, setResetting] = useState(false)
+  const [now, setNow] = useState(Date.now())
+
+  // Re-check stuck status periodically so a running job surfaces the reset button
+  useEffect(() => {
+    if (research?.status !== 'running' && research?.status !== 'pending') return
+    const id = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [research?.status])
+
+  // Detect stuck research: running/pending for >5 minutes
+  const isStuck = !running && research != null
+    && (research.status === 'running' || research.status === 'pending')
+    && research.updated_at
+    && (now - new Date(research.updated_at).getTime()) > 5 * 60 * 1000
+
+  async function handleReset() {
+    setResetting(true)
+    try {
+      const res = await fetch('/api/ai/lead-research/cancel-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_ids: [leadId] }),
+      })
+      if (res.ok) {
+        onResearchComplete()
+      } else {
+        setError('Failed to reset research. Try again.')
+      }
+    } catch {
+      setError('Failed to reset research. Try again.')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   const handleStart = () => {
     setError(null)
@@ -46,6 +81,26 @@ export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExist
     return (
       <div className="space-y-4">
         <ResearchProgress leadId={leadId} pollOnly={pollOnly} onComplete={handleComplete} onError={handleError} />
+      </div>
+    )
+  }
+
+  if (isStuck) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-yellow-400 text-sm p-3 bg-yellow-400/5 border border-yellow-400/20 rounded-md">
+          <AlertCircle size={14} />
+          Research appears stuck — no updates in over 5 minutes.
+        </div>
+        <Button
+          onClick={handleReset}
+          disabled={resetting}
+          variant="outline"
+          className="border-[#2a2a2a] text-[#999999]"
+        >
+          <RotateCcw size={14} className={`mr-2 ${resetting ? 'animate-spin' : ''}`} />
+          {resetting ? 'Resetting...' : 'Reset Research'}
+        </Button>
       </div>
     )
   }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Loader2, CheckCircle2, XCircle, Circle, ChevronDown } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Circle, ChevronDown, Ban } from 'lucide-react'
 
 interface BatchItem {
   lead_id: string
@@ -30,9 +30,10 @@ const STEP_ORDER = ['website_audit', 'social_audit', 'business_intel', 'service_
 interface BatchResearchProgressProps {
   batchLeadIds: string[]
   onBatchComplete: () => void
+  onCancelBatch?: () => void
 }
 
-export function BatchResearchProgress({ batchLeadIds, onBatchComplete }: BatchResearchProgressProps) {
+export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelBatch }: BatchResearchProgressProps) {
   const [items, setItems] = useState<BatchItem[]>([])
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -114,10 +115,19 @@ export function BatchResearchProgress({ batchLeadIds, onBatchComplete }: BatchRe
       {open && (
         <div className="absolute right-0 top-full mt-1.5 z-50 w-[320px] bg-[#111111] border border-[#2a2a2a] rounded-md shadow-lg shadow-black/50 overflow-hidden">
           {/* Header */}
-          <div className="px-3 py-2 border-b border-[#2a2a2a]">
+          <div className="px-3 py-2 border-b border-[#2a2a2a] flex items-center justify-between">
             <p className="text-xs font-medium text-white">
               Batch Research — {completedCount + failedCount} of {totalCount}
             </p>
+            {isRunning && onCancelBatch && (
+              <button
+                onClick={onCancelBatch}
+                className="inline-flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
+              >
+                <Ban size={10} />
+                Cancel
+              </button>
+            )}
           </div>
 
           {/* Queue list */}

@@ -143,6 +143,24 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
     }
   }
 
+  const cancelBatchResearch = useCallback(async () => {
+    batchAbortRef.current?.abort()
+    const ids = [...batchLeadIds]
+    if (ids.length > 0) {
+      try {
+        const res = await fetch('/api/ai/lead-research/cancel-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_ids: ids }),
+        })
+        if (!res.ok) return // keep batch visible so user can retry
+      } catch {
+        return // keep batch visible so user can retry
+      }
+    }
+    setBatchLeadIds(new Set())
+  }, [batchLeadIds])
+
   const handleBatchComplete = useCallback(() => {
     setBatchLeadIds(new Set())
     window.location.reload()
@@ -291,6 +309,7 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         onBatchResearch={startBatchResearch}
         batchLeadIds={batchLeadIdsArray}
         onBatchComplete={handleBatchComplete}
+        onCancelBatch={cancelBatchResearch}
       />
 
       {/* View area */}

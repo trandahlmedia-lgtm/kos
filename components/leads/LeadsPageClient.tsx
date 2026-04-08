@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Plus, Upload, FlaskConical, X } from 'lucide-react'
 import {
   DndContext,
@@ -96,7 +96,15 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
     setSelectedLeadIds(new Set())
   }
 
+  // Abort controller for client-driven sequential processing
+  const batchAbortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    return () => { batchAbortRef.current?.abort() }
+  }, [])
+
   async function startBatchResearch(leadIds: string[]) {
+    batchAbortRef.current?.abort()
     clearSelection()
     try {
       const res = await fetch('/api/ai/lead-research/batch', {
@@ -111,6 +119,25 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
       }
       const data = await res.json() as { lead_ids: string[] }
       setBatchLeadIds(new Set(data.lead_ids))
+
+      // Drive sequential processing from the client — one lead at a time
+      const controller = new AbortController()
+      batchAbortRef.current = controller
+      for (const id of data.lead_ids) {
+        if (controller.signal.aborted) break
+        try {
+          const processRes = await fetch('/api/ai/lead-research/process-one', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lead_id: id }),
+            signal: controller.signal,
+          })
+          if (!processRes.ok && processRes.status === 401) break
+        } catch (err) {
+          if (controller.signal.aborted) break
+          console.error(`[batch-research] Failed to process ${id}:`, err)
+        }
+      }
     } catch {
       // ignore
     }
@@ -207,6 +234,9 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
 
   // --- Derived data ---
 
+  // Stable array reference — only recreates when the Set itself changes
+  const batchLeadIdsArray = useMemo(() => [...batchLeadIds], [batchLeadIds])
+
   const filteredLeads = filterLeads(leads, filters)
   const sortedLeads = sortLeads(filteredLeads, sortKey, sortDirection)
 
@@ -259,7 +289,7 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         filteredCount={filteredLeads.length}
         totalCount={leads.length}
         onBatchResearch={startBatchResearch}
-        batchLeadIds={[...batchLeadIds]}
+        batchLeadIds={batchLeadIdsArray}
         onBatchComplete={handleBatchComplete}
       />
 

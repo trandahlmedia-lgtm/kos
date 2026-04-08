@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { adminClient } from '@/lib/supabase/admin'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type StepStatus = 'complete' | 'running' | 'pending'
+
+/** Check that a JSONB value has actual content (not null, not empty {}) */
+function hasContent(val: unknown): boolean {
+  if (!val) return false
+  if (typeof val === 'object' && !Array.isArray(val) && Object.keys(val as Record<string, unknown>).length === 0) return false
+  return true
+}
 
 /**
  * GET /api/ai/lead-research/batch-status?lead_ids=id1,id2,id3
@@ -24,8 +32,26 @@ export async function GET(request: Request) {
   // Fetch research rows — select step fields to infer completion (small JSON, acceptable at this scale)
   const { data: researchRows } = await supabase
     .from('lead_research')
-    .select('lead_id, status, error_message, overall_score, website_audit, social_audit, business_intel, service_fit, pricing_analysis, full_report')
+    .select('lead_id, status, error_message, overall_score, updated_at, website_audit, social_audit, business_intel, service_fit, pricing_analysis')
     .in('lead_id', leadIds)
+
+  // Recover stale leads: if pending/running for >10 min, mark failed
+  const STALE_MS = 10 * 60 * 1000
+  const now = Date.now()
+  for (const row of researchRows ?? []) {
+    if ((row.status === 'pending' || row.status === 'running') && row.updated_at) {
+      const age = now - new Date(row.updated_at as string).getTime()
+      if (age > STALE_MS) {
+        await adminClient.from('lead_research').update({
+          status: 'failed',
+          error_message: 'Timed out — processing was interrupted',
+          updated_at: new Date().toISOString(),
+        }).eq('lead_id', row.lead_id).in('status', ['pending', 'running'])
+        row.status = 'failed'
+        row.error_message = 'Timed out — processing was interrupted'
+      }
+    }
+  }
 
   // Fetch lead names
   const { data: leads } = await supabase
@@ -45,12 +71,12 @@ export async function GET(request: Request) {
     }
 
     const steps: Record<string, StepStatus> = {
-      website_audit: research.website_audit ? 'complete' : 'pending',
-      social_audit: research.social_audit ? 'complete' : 'pending',
-      business_intel: research.business_intel ? 'complete' : 'pending',
-      service_fit: research.service_fit ? 'complete' : 'pending',
-      pricing_analysis: research.pricing_analysis ? 'complete' : 'pending',
-      synthesis: research.full_report ? 'complete' : 'pending',
+      website_audit: hasContent(research.website_audit) ? 'complete' : 'pending',
+      social_audit: hasContent(research.social_audit) ? 'complete' : 'pending',
+      business_intel: hasContent(research.business_intel) ? 'complete' : 'pending',
+      service_fit: hasContent(research.service_fit) ? 'complete' : 'pending',
+      pricing_analysis: hasContent(research.pricing_analysis) ? 'complete' : 'pending',
+      synthesis: research.overall_score != null ? 'complete' : 'pending',
     }
 
     // Mark the currently running step

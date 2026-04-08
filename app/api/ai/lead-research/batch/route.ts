@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
-import { after } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { adminClient } from '@/lib/supabase/admin'
 import { checkRateLimit, userAction, LIMITS } from '@/lib/security/rateLimit'
-import { runResearchPipeline } from '@/lib/ai/researchPipeline'
 
 const requestSchema = z.object({
   lead_ids: z.array(z.string().uuid()).min(1).max(50),
@@ -98,30 +95,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'All selected leads already have research running' }, { status: 409 })
   }
 
-  // Fire-and-forget: process sequentially in background (one at a time)
-  const userId = user.id
-  after(async () => {
-    for (const lead of claimedLeads) {
-      try {
-        // Mark this lead as running before starting
-        await adminClient.from('lead_research').update({
-          status: 'running',
-          updated_at: new Date().toISOString(),
-        }).eq('lead_id', lead.id).eq('status', 'pending')
-
-        await runResearchPipeline(adminClient, lead.id, lead, userId)
-      } catch (err) {
-        // Mark failed so the queue continues to the next lead
-        console.error(`[batch-research] Unhandled error for lead ${lead.id}:`, err)
-        await adminClient.from('lead_research').update({
-          status: 'failed',
-          error_message: err instanceof Error ? err.message : 'Unknown batch error',
-          updated_at: new Date().toISOString(),
-        }).eq('lead_id', lead.id)
-      }
-    }
-  })
-
+  // Claim-only: the client drives sequential processing via /process-one
   return NextResponse.json({
     status: 'started',
     count: claimedLeads.length,

@@ -181,9 +181,9 @@ export function LeadDetailPanel({
           ) : (
             <>
               <SheetHeader className="px-5 py-4 border-b border-[#2a2a2a] shrink-0">
-                <div className="flex items-start justify-between gap-2">
-                  <SheetTitle className="text-white text-base leading-tight">{lead.business_name}</SheetTitle>
-                  <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-start gap-3">
+                  <SheetTitle className="text-white text-base leading-tight min-w-0 truncate">{lead.business_name}</SheetTitle>
+                  <div className="flex items-center gap-1 shrink-0 ml-auto">
                     {isWon && (
                       <Button
                         size="sm"

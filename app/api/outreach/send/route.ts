@@ -175,18 +175,26 @@ export async function POST(request: Request) {
         .eq('lead_id', email.lead_id)
     }
 
-    // Update lead stage if still 'new'
-    const { data: lead } = await supabase
-      .from('leads')
-      .select('stage')
-      .eq('id', email.lead_id)
-      .single()
-
-    if (lead?.stage === 'new') {
-      await supabase
+    // Auto-update lead stage: new → reached_out on first outreach email only.
+    // Uses conditional update (eq stage + neq heat_level) to avoid read-then-write race.
+    if (followUpNumber === 0) {
+      const { data: updated } = await supabase
         .from('leads')
         .update({ stage: 'reached_out', stage_updated_at: now, updated_at: now })
         .eq('id', email.lead_id)
+        .eq('stage', 'new')
+        .neq('heat_level', 'cut')
+        .select('id')
+
+      if (updated && updated.length > 0) {
+        await supabase.from('lead_activities').insert({
+          lead_id: email.lead_id,
+          user_id: user.id,
+          type: 'stage_change',
+          content: 'Stage updated to reached_out',
+          metadata: { to_stage: 'reached_out', trigger: 'auto', reason: 'first_outreach_email_sent', email_id },
+        })
+      }
     }
 
     // Log activity

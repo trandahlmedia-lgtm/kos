@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   // Find our email record by resend_id
   const { data: email, error: findErr } = await adminClient
     .from('outreach_emails')
-    .select('id, lead_id, status')
+    .select('id, lead_id, status, follow_up_number')
     .eq('resend_id', resendId)
     .single()
 
@@ -60,10 +60,34 @@ export async function POST(request: Request) {
 
   switch (type) {
     case 'email.delivered': {
-      await adminClient
-        .from('outreach_emails')
-        .update({ status: 'delivered', updated_at: now })
-        .eq('id', email.id)
+      // Only advance to delivered if not already opened/replied (guard out-of-order webhooks)
+      if (email.status !== 'opened' && email.status !== 'replied') {
+        await adminClient
+          .from('outreach_emails')
+          .update({ status: 'delivered', updated_at: now })
+          .eq('id', email.id)
+      }
+
+      // Safety net: atomic stage update for initial emails only (send action may have failed)
+      if (email.follow_up_number === 0) {
+        const { data: updated } = await adminClient
+          .from('leads')
+          .update({ stage: 'reached_out', stage_updated_at: now, updated_at: now })
+          .eq('id', email.lead_id)
+          .eq('stage', 'new')
+          .neq('heat_level', 'cut')
+          .select('id')
+
+        if (updated && updated.length > 0) {
+          await adminClient.from('lead_activities').insert({
+            lead_id: email.lead_id,
+            user_id: null,
+            type: 'stage_change',
+            content: 'Stage updated to reached_out',
+            metadata: { to_stage: 'reached_out', trigger: 'auto', reason: 'first_outreach_email_sent', email_id: email.id, source: 'webhook_fallback' },
+          })
+        }
+      }
       break
     }
 

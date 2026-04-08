@@ -1,6 +1,7 @@
 'use client'
 
-import { LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, FlaskConical, Loader2 } from 'lucide-react'
+import { LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, FlaskConical } from 'lucide-react'
+import { BatchResearchProgress } from './BatchResearchProgress'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -46,7 +47,8 @@ interface LeadsToolbarProps {
   filteredCount: number
   totalCount: number
   onBatchResearch?: (leadIds: string[]) => void
-  researchingCount?: number
+  batchLeadIds?: string[]
+  onBatchComplete?: () => void
 }
 
 function toggleInArray<T>(arr: T[], value: T): T[] {
@@ -66,7 +68,8 @@ export function LeadsToolbar({
   filteredCount,
   totalCount,
   onBatchResearch,
-  researchingCount,
+  batchLeadIds,
+  onBatchComplete,
 }: LeadsToolbarProps) {
   const activeFilterCount = countActiveFilters(filters)
   const industries = getDistinctIndustries(allLeads)
@@ -282,12 +285,12 @@ export function LeadsToolbar({
           </span>
         )}
 
-        {/* Researching indicator */}
-        {(researchingCount ?? 0) > 0 && (
-          <span className="flex items-center gap-1.5 text-xs text-[#E8732A]">
-            <Loader2 size={12} className="animate-spin" />
-            {researchingCount} researching
-          </span>
+        {/* Batch research progress dropdown */}
+        {(batchLeadIds?.length ?? 0) > 0 && onBatchComplete && (
+          <BatchResearchProgress
+            batchLeadIds={batchLeadIds!}
+            onBatchComplete={onBatchComplete}
+          />
         )}
 
         {/* Batch research buttons */}

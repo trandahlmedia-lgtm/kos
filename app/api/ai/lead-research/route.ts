@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     .eq('lead_id', lead_id)
     .single()
 
-  if (existingRow?.status === 'running') {
+  if (existingRow?.status === 'running' || existingRow?.status === 'pending') {
     return NextResponse.json(
       { error: 'Research is already in progress for this lead.' },
       { status: 409 }
@@ -75,12 +75,12 @@ export async function POST(request: Request) {
 
   let claimed = false
   if (existingRow) {
-    // Atomic conditional update: only claim if still not running
+    // Atomic conditional update: only claim if not running or pending (batch-reserved)
     const { data: updated } = await supabase
       .from('lead_research')
       .update(runningFields)
       .eq('lead_id', lead_id)
-      .neq('status', 'running')
+      .not('status', 'in', '("running","pending")')
       .select('id')
       .single()
     claimed = !!updated

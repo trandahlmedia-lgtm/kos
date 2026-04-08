@@ -13,10 +13,13 @@ export async function GET() {
 
   const { data } = await supabase
     .from('lead_research')
-    .select('lead_id')
-    .eq('status', 'running')
+    .select('lead_id, status')
+    .in('status', ['running', 'pending'])
 
+  const rows = data ?? []
   return NextResponse.json({
-    lead_ids: (data ?? []).map((r) => r.lead_id),
+    lead_ids: rows.map((r) => r.lead_id),
+    running_ids: rows.filter((r) => r.status === 'running').map((r) => r.lead_id),
+    pending_ids: rows.filter((r) => r.status === 'pending').map((r) => r.lead_id),
   })
 }

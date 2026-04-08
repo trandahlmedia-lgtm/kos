@@ -116,15 +116,10 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
     }
   }
 
-  // Track batch completion — reload when all batch leads finish
-  useEffect(() => {
-    if (batchLeadIds.size === 0) return
-    const allDone = [...batchLeadIds].every((id) => !researchingLeadIds.has(id))
-    if (allDone) {
-      setBatchLeadIds(new Set())
-      window.location.reload()
-    }
-  }, [researchingLeadIds, batchLeadIds])
+  const handleBatchComplete = useCallback(() => {
+    setBatchLeadIds(new Set())
+    window.location.reload()
+  }, [])
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -264,7 +259,8 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         filteredCount={filteredLeads.length}
         totalCount={leads.length}
         onBatchResearch={startBatchResearch}
-        researchingCount={researchingLeadIds.size}
+        batchLeadIds={[...batchLeadIds]}
+        onBatchComplete={handleBatchComplete}
       />
 
       {/* View area */}

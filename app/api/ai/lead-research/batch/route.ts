@@ -54,8 +54,8 @@ export async function POST(request: Request) {
 
   const existingMap = new Map((existingResearch ?? []).map((r) => [r.lead_id, r]))
 
-  const runningFields = {
-    status: 'running' as const,
+  const pendingFields = {
+    status: 'pending' as const,
     error_message: null,
     website_audit: null,
     social_audit: null,
@@ -70,22 +70,22 @@ export async function POST(request: Request) {
   const claimedLeads: typeof leads = []
   for (const lead of leads) {
     const existing = existingMap.get(lead.id)
-    if (existing?.status === 'running') continue
+    if (existing?.status === 'running' || existing?.status === 'pending') continue
 
     let claimed = false
     if (existing) {
       const { data: updated } = await supabase
         .from('lead_research')
-        .update(runningFields)
+        .update(pendingFields)
         .eq('lead_id', lead.id)
-        .neq('status', 'running')
+        .not('status', 'in', '("running","pending")')
         .select('id')
         .single()
       claimed = !!updated
     } else {
       const { data: inserted } = await supabase
         .from('lead_research')
-        .insert({ lead_id: lead.id, ...runningFields })
+        .insert({ lead_id: lead.id, ...pendingFields })
         .select('id')
         .single()
       claimed = !!inserted
@@ -98,11 +98,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'All selected leads already have research running' }, { status: 409 })
   }
 
-  // Fire-and-forget: process sequentially in background
+  // Fire-and-forget: process sequentially in background (one at a time)
   const userId = user.id
   after(async () => {
     for (const lead of claimedLeads) {
-      await runResearchPipeline(adminClient, lead.id, lead, userId)
+      try {
+        // Mark this lead as running before starting
+        await adminClient.from('lead_research').update({
+          status: 'running',
+          updated_at: new Date().toISOString(),
+        }).eq('lead_id', lead.id).eq('status', 'pending')
+
+        await runResearchPipeline(adminClient, lead.id, lead, userId)
+      } catch (err) {
+        // Mark failed so the queue continues to the next lead
+        console.error(`[batch-research] Unhandled error for lead ${lead.id}:`, err)
+        await adminClient.from('lead_research').update({
+          status: 'failed',
+          error_message: err instanceof Error ? err.message : 'Unknown batch error',
+          updated_at: new Date().toISOString(),
+        }).eq('lead_id', lead.id)
+      }
     }
   })
 

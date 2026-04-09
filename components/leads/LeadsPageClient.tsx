@@ -175,9 +175,19 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
     setBatchLeadIds(new Set())
   }, [batchLeadIds])
 
-  const handleBatchComplete = useCallback(() => {
+  const handleBatchComplete = useCallback(async () => {
     setBatchLeadIds(new Set())
-    window.location.reload()
+    // Refresh leads data without full page reload — avoids disrupting UI state
+    try {
+      const res = await fetch('/api/leads')
+      if (res.ok) {
+        const data = await res.json() as { leads: Lead[] }
+        if (data.leads) setLeads(data.leads)
+      }
+    } catch {
+      // Fallback to reload if fetch fails
+      window.location.reload()
+    }
   }, [])
 
   // DnD state
@@ -345,8 +355,8 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="flex-1 overflow-x-auto">
-            <div className="flex gap-4 px-6 py-5 min-w-max">
+          <div className="flex-1 overflow-x-auto overflow-y-hidden">
+            <div className="flex gap-4 px-6 py-5 min-w-max h-full">
               {STAGES.map((stage) => (
                 <KanbanColumn
                   key={stage}

@@ -34,11 +34,11 @@ export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExist
     return () => window.clearInterval(id)
   }, [research?.status])
 
-  // Detect stuck research: running/pending for >5 minutes
+  // Detect stuck research: running/pending for >3 minutes
   const isStuck = !running && research != null
     && (research.status === 'running' || research.status === 'pending')
     && research.updated_at
-    && (now - new Date(research.updated_at).getTime()) > 5 * 60 * 1000
+    && (now - new Date(research.updated_at).getTime()) > 3 * 60 * 1000
 
   async function handleReset() {
     setResetting(true)
@@ -91,7 +91,7 @@ export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExist
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-yellow-400 text-sm p-3 bg-yellow-400/5 border border-yellow-400/20 rounded-md">
           <AlertCircle size={14} />
-          Research appears stuck — no updates in over 5 minutes.
+          Research appears stuck — no updates in over 3 minutes.
         </div>
         <Button
           onClick={handleReset}

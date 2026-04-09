@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   // Upsert into opt-outs (uses service role — no RLS user context)
   const { error } = await adminClient
     .from('email_opt_outs')
-    .upsert({ email: normalizedEmail }, { onConflict: 'email' })
+    .upsert({ email: normalizedEmail, source: 'unsubscribe' }, { onConflict: 'email' })
 
   if (error) {
     console.error('[unsubscribe] Error:', error)

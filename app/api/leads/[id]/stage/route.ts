@@ -30,6 +30,8 @@ export async function PATCH(
   const { stage, lost_reason } = parsed.data
   const now = new Date().toISOString()
 
+  console.log('[STAGE-API] Updating lead stage:', { id, stage, lost_reason })
+
   const updates: Record<string, unknown> = {
     stage,
     stage_updated_at: now,
@@ -45,9 +47,11 @@ export async function PATCH(
     .single()
 
   if (error) {
-    console.error('[PATCH /api/leads/[id]/stage]', error)
-    return NextResponse.json({ error: 'Failed to update stage' }, { status: 500 })
+    console.error('[STAGE-API] Supabase error:', { code: error.code, message: error.message, details: error.details, hint: error.hint })
+    return NextResponse.json({ error: 'Failed to update stage', details: error.message }, { status: 500 })
   }
+
+  console.log('[STAGE-API] Success — lead updated:', { id, newStage: data.stage })
 
   // Log activity
   await supabase.from('lead_activities').insert({

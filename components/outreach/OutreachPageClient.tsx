@@ -9,6 +9,7 @@ import { FollowUpsDue } from './FollowUpsDue'
 import { HotLeads } from './HotLeads'
 import { OutreachStats } from './OutreachStats'
 import { OutreachSettings } from './OutreachSettings'
+import { TimeRangeFilter, getCutoffDate, type TimeRange } from './TimeRangeFilter'
 import type { OutreachEmail, OutreachSettings as OutreachSettingsType, Lead } from '@/types'
 
 export interface EmailWithLead extends OutreachEmail {
@@ -48,12 +49,20 @@ export function OutreachPageClient({
   const [emails, setEmails] = useState<EmailWithLead[]>(initialEmails)
   const [settings, setSettings] = useState<OutreachSettingsType | null>(initialSettings)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [timeRange, setTimeRange] = useState<TimeRange>('30d')
+  const [activeTab, setActiveTab] = useState('review')
 
   const draftEmails = emails.filter((e) => e.status === 'draft' || e.status === 'queued')
   const followUpEmails = emails.filter(
     (e) => e.status === 'draft' && e.follow_up_number > 0
   )
-  const sentEmails = emails.filter((e) => e.status === 'sent' || e.status === 'delivered' || e.status === 'opened')
+  const allSentEmails = emails.filter((e) => e.status === 'sent' || e.status === 'delivered' || e.status === 'opened')
+
+  // Apply time range filter to sent emails
+  const cutoff = getCutoffDate(timeRange)
+  const sentEmails = cutoff
+    ? allSentEmails.filter((e) => e.sent_at && new Date(e.sent_at) >= cutoff)
+    : allSentEmails
 
   function handleEmailUpdated(updated: OutreachEmail) {
     setEmails((prev) => prev.map((e) => e.id === updated.id ? { ...e, ...updated } : e))
@@ -84,7 +93,7 @@ export function OutreachPageClient({
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="review" className="flex flex-col flex-1 overflow-hidden">
+      <Tabs defaultValue="review" onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
         <TabsList className="shrink-0 bg-transparent border-b border-[#2a2a2a] rounded-none px-6 gap-0 justify-start">
           <TabsTrigger
             value="review"
@@ -126,6 +135,13 @@ export function OutreachPageClient({
             Stats
           </TabsTrigger>
         </TabsList>
+
+        {/* Time range filter — visible on review and stats tabs */}
+        {(activeTab === 'review' || activeTab === 'stats') && (
+          <div className="shrink-0 px-6 py-2.5 border-b border-[#2a2a2a] bg-[#0a0a0a]">
+            <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           <TabsContent value="review" className="m-0 p-6">

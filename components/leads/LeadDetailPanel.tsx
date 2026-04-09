@@ -91,12 +91,19 @@ export function LeadDetailPanel({
 
   async function handleStageChange(stage: LeadStage, lostReason?: string) {
     if (!leadId) return
+    console.log('[STAGE-DEBUG] API call starting:', { leadId, stage, lostReason })
     const res = await fetch(`/api/leads/${leadId}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stage, lost_reason: lostReason }),
     })
-    if (!res.ok) return
+    if (!res.ok) {
+      const errorBody = await res.text()
+      console.error('[STAGE-DEBUG] API returned error:', { status: res.status, body: errorBody })
+      return
+    }
+    const resData = await res.json()
+    console.log('[STAGE-DEBUG] API success:', resData)
     await fetchData()
     if (data?.lead) onLeadUpdated({ ...data.lead, stage })
   }

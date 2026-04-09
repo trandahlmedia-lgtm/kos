@@ -14,10 +14,77 @@ import {
   calculateOverallScore,
 } from '@/lib/ai/prompts/leadResearch'
 
+// --- Retry helpers ---
+
+const MAX_RETRIES = 2
+const BACKOFF_MS = [5_000, 15_000] // exponential backoff: 5s, 15s
+
+function isTransientError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.toLowerCase()
+  // API timeouts, rate limits, network errors, 5xx from Anthropic
+  if (msg.includes('timeout') || msg.includes('timed out')) return true
+  if (msg.includes('rate limit') || msg.includes('429')) return true
+  if (msg.includes('network') || msg.includes('econnreset') || msg.includes('econnrefused') || msg.includes('fetch failed')) return true
+  if (msg.includes('overloaded')) return true
+  // Anthropic SDK error shapes — any 5xx or 429
+  if ('status' in err) {
+    const status = (err as { status: number }).status
+    if (status === 429 || (status >= 500 && status < 600)) return true
+  }
+  return false
+}
+
+function isPermanentError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.toLowerCase()
+  if (msg.includes('400') || msg.includes('invalid')) return true
+  if ('status' in err) {
+    const status = (err as { status: number }).status
+    if (status === 400 || status === 401 || status === 403 || status === 404) return true
+  }
+  return false
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function callClaudeWithRetry(
+  params: Parameters<typeof callClaude>[0],
+  label: string,
+  supabase?: SupabaseClient,
+  leadId?: string,
+): ReturnType<typeof callClaude> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await callClaude(params)
+    } catch (err) {
+      lastError = err
+      if (isPermanentError(err)) throw err
+      if (!isTransientError(err) || attempt === MAX_RETRIES) {
+        const suffix = attempt > 0 ? ` after ${attempt + 1} attempts` : ''
+        throw new Error(`${label} failed${suffix}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+      console.warn(`[research-pipeline] ${label} attempt ${attempt + 1} failed, retrying in ${BACKOFF_MS[attempt]}ms:`, err instanceof Error ? err.message : err)
+      // Touch updated_at so the stale detector doesn't kill this active retry
+      if (supabase && leadId) {
+        await supabase.from('lead_research').update({
+          updated_at: new Date().toISOString(),
+        }).eq('lead_id', leadId).eq('status', 'running')
+      }
+      await sleep(BACKOFF_MS[attempt])
+    }
+  }
+  throw lastError
+}
+
 /**
  * Run the full 5-agent + orchestrator research pipeline for a single lead.
  * Saves results incrementally to lead_research so polling can track progress.
  * Must be called from a server context (API route, after(), etc).
+ * Includes auto-retry with exponential backoff for transient errors.
  */
 export async function runResearchPipeline(
   supabase: SupabaseClient,
@@ -26,6 +93,16 @@ export async function runResearchPipeline(
   userId: string,
 ): Promise<void> {
   const startedAt = Date.now()
+
+  // Validate lead data upfront — permanent failure if missing
+  if (!lead.business_name) {
+    await supabase.from('lead_research').update({
+      status: 'failed',
+      error_message: 'Invalid lead data: no business name',
+      updated_at: new Date().toISOString(),
+    }).eq('lead_id', leadId)
+    return
+  }
 
   // Helper: check if this research row is still running (not cancelled/failed)
   async function isStillRunning(): Promise<boolean> {
@@ -42,7 +119,7 @@ export async function runResearchPipeline(
     let websiteContent = ''
     if (lead.website) websiteContent = await fetchWebsiteText(lead.website as string)
 
-    const waResult = await callClaude({
+    const waResult = await callClaudeWithRetry({
       model: MODEL.fast,
       system: WEBSITE_AUDITOR_SYSTEM,
       prompt: buildWebsiteAuditorPrompt({
@@ -51,7 +128,7 @@ export async function runResearchPipeline(
         websiteContent,
       }),
       maxTokens: 1024,
-    })
+    }, 'Website auditor', supabase, leadId)
     let websiteAudit: Record<string, unknown> = {}
     try { websiteAudit = JSON.parse(extractJSON(waResult.content)) as Record<string, unknown> } catch { /* use empty */ }
 
@@ -63,7 +140,7 @@ export async function runResearchPipeline(
     if (!await isStillRunning()) return
 
     // ── Sub-agent 2: Social Auditor ───────────────────────────────────
-    const saResult = await callClaude({
+    const saResult = await callClaudeWithRetry({
       model: MODEL.fast,
       system: SOCIAL_AUDITOR_SYSTEM,
       prompt: buildSocialAuditorPrompt({
@@ -73,7 +150,7 @@ export async function runResearchPipeline(
         googleBusinessUrl: lead.google_business_url as string | null,
       }),
       maxTokens: 1024,
-    })
+    }, 'Social auditor', supabase, leadId)
     let socialAudit: Record<string, unknown> = {}
     try { socialAudit = JSON.parse(extractJSON(saResult.content)) as Record<string, unknown> } catch { /* use empty */ }
 
@@ -85,7 +162,7 @@ export async function runResearchPipeline(
     if (!await isStillRunning()) return
 
     // ── Sub-agent 3: Business Intelligence ────────────────────────────
-    const biResult = await callClaude({
+    const biResult = await callClaudeWithRetry({
       model: MODEL.fast,
       system: BUSINESS_INTEL_SYSTEM,
       prompt: buildBusinessIntelPrompt({
@@ -99,7 +176,7 @@ export async function runResearchPipeline(
         socialScore: (socialAudit.overall_score as number) ?? 0,
       }),
       maxTokens: 1024,
-    })
+    }, 'Business intelligence', supabase, leadId)
     let businessIntel: Record<string, unknown> = {}
     try { businessIntel = JSON.parse(extractJSON(biResult.content)) as Record<string, unknown> } catch { /* use empty */ }
 
@@ -111,7 +188,7 @@ export async function runResearchPipeline(
     if (!await isStillRunning()) return
 
     // ── Sub-agent 4: Service Fit ──────────────────────────────────────
-    const sfResult = await callClaude({
+    const sfResult = await callClaudeWithRetry({
       model: MODEL.fast,
       system: SERVICE_FIT_SYSTEM,
       prompt: buildServiceFitPrompt({
@@ -121,7 +198,7 @@ export async function runResearchPipeline(
         businessIntel,
       }),
       maxTokens: 1024,
-    })
+    }, 'Service fit', supabase, leadId)
     let serviceFit: Record<string, unknown> = {}
     try { serviceFit = JSON.parse(extractJSON(sfResult.content)) as Record<string, unknown> } catch { /* use empty */ }
 
@@ -133,7 +210,7 @@ export async function runResearchPipeline(
     if (!await isStillRunning()) return
 
     // ── Sub-agent 5: Pricing Recommender ─────────────────────────────
-    const prResult = await callClaude({
+    const prResult = await callClaudeWithRetry({
       model: MODEL.fast,
       system: PRICING_RECOMMENDER_SYSTEM,
       prompt: buildPricingRecommenderPrompt({
@@ -144,7 +221,7 @@ export async function runResearchPipeline(
         serviceFit,
       }),
       maxTokens: 1024,
-    })
+    }, 'Pricing recommender', supabase, leadId)
     let pricingAnalysis: Record<string, unknown> = {}
     try { pricingAnalysis = JSON.parse(extractJSON(prResult.content)) as Record<string, unknown> } catch { /* use empty */ }
 
@@ -156,7 +233,7 @@ export async function runResearchPipeline(
     if (!await isStillRunning()) return
 
     // ── Orchestrator: Synthesis ───────────────────────────────────────
-    const orchResult = await callClaude({
+    const orchResult = await callClaudeWithRetry({
       model: MODEL.default,
       system: ORCHESTRATOR_SYSTEM,
       prompt: buildOrchestratorPrompt({
@@ -168,7 +245,7 @@ export async function runResearchPipeline(
         pricingAnalysis,
       }),
       maxTokens: 4096,
-    })
+    }, 'Orchestrator', supabase, leadId)
     const fullReport = orchResult.content
 
     const overallScore = calculateOverallScore({

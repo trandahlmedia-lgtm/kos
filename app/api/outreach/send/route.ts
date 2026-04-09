@@ -86,6 +86,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'This recipient has opted out of emails' }, { status: 400 })
   }
 
+  // Check if lead is disqualified (belt-and-suspenders with opt-out check)
+  const { data: leadCheck } = await supabase
+    .from('leads')
+    .select('stage, heat_level')
+    .eq('id', email.lead_id)
+    .single()
+
+  if (leadCheck?.stage === 'lost' && leadCheck?.heat_level === 'cut') {
+    return NextResponse.json({ error: 'Cannot send email to a disqualified lead' }, { status: 400 })
+  }
+
   // Check daily limit from settings (separate from rate limiter)
   const today = new Date().toISOString().split('T')[0]
   const { count: sentToday } = await supabase
@@ -178,18 +189,21 @@ export async function POST(request: Request) {
 
     // Auto-update lead stage: new → reached_out on first outreach email only.
     // Uses conditional update (eq stage + neq heat_level) to avoid read-then-write race.
-    console.log('[AUTO-STAGE] Checking lead stage update', { leadId: email.lead_id, followUpNumber })
+    let stageUpdated = false
     if (followUpNumber === 0) {
-      const { data: updated } = await supabase
+      const { data: updated, error: stageError } = await supabase
         .from('leads')
         .update({ stage: 'reached_out', stage_updated_at: now, updated_at: now })
         .eq('id', email.lead_id)
         .eq('stage', 'new')
-        .neq('heat_level', 'cut')
+        .or('heat_level.is.null,heat_level.neq.cut')
         .select('id')
 
+      if (stageError) console.error('[AUTO-STAGE] Supabase error:', stageError)
+      console.log('[AUTO-STAGE] Update result:', { updated, leadId: email.lead_id, followUpNumber })
+
       if (updated && updated.length > 0) {
-        console.log('[AUTO-STAGE] Lead updated to reached_out', { leadId: email.lead_id })
+        stageUpdated = true
         await supabase.from('lead_activities').insert({
           lead_id: email.lead_id,
           user_id: user.id,
@@ -211,7 +225,7 @@ export async function POST(request: Request) {
       metadata: { email_id, resend_id: resendId },
     })
 
-    return NextResponse.json({ success: true, resendId })
+    return NextResponse.json({ success: true, resendId, stageUpdated })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[outreach/send] Error:', message)

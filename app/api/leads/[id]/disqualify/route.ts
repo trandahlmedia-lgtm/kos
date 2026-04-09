@@ -29,7 +29,64 @@ export async function POST(
   const { reason } = parsed.data
   const now = new Date().toISOString()
 
-  // 1. Update lead: stage → lost, heat_level → cut, set lost_reason
+  // Fetch lead first to validate state and get email for opt-out
+  const { data: existing, error: fetchError } = await supabase
+    .from('leads')
+    .select('email, stage, heat_level')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !existing) {
+    return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+  }
+
+  // State validation: don't disqualify an already-disqualified or won lead
+  if (existing.stage === 'lost' && existing.heat_level === 'cut') {
+    return NextResponse.json({ error: 'Lead is already disqualified' }, { status: 400 })
+  }
+  if (existing.stage === 'won') {
+    return NextResponse.json({ error: 'Cannot disqualify a won lead' }, { status: 400 })
+  }
+
+  // 1-2: Cancel outreach and add opt-out BEFORE updating lead stage
+  // This closes the race window where a concurrent send could go out
+  const warnings: string[] = []
+
+  const leadEmail = (existing as { email?: string | null }).email
+  if (leadEmail) {
+    const { error: optOutError } = await supabase
+      .from('email_opt_outs')
+      .upsert(
+        { email: leadEmail.toLowerCase(), opted_out_at: now, source: 'disqualify' },
+        { onConflict: 'email' }
+      )
+    if (optOutError) {
+      console.error('[disqualify] failed to add opt-out:', optOutError)
+      warnings.push('Failed to add email opt-out')
+    }
+  }
+
+  const { error: emailError } = await supabase
+    .from('outreach_emails')
+    .update({ status: 'cancelled', updated_at: now })
+    .eq('lead_id', id)
+    .in('status', ['draft', 'queued'])
+  if (emailError) {
+    console.error('[disqualify] failed to cancel emails:', emailError)
+    warnings.push('Failed to cancel outreach emails')
+  }
+
+  const { error: seqError } = await supabase
+    .from('outreach_sequences')
+    .update({ status: 'completed', updated_at: now })
+    .eq('lead_id', id)
+    .eq('status', 'active')
+  if (seqError) {
+    console.error('[disqualify] failed to complete sequences:', seqError)
+    warnings.push('Failed to complete outreach sequences')
+  }
+
+  // 3. Update lead: stage → lost, heat_level → cut, set lost_reason
   const { data: lead, error: leadError } = await supabase
     .from('leads')
     .update({
@@ -48,41 +105,7 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to disqualify lead' }, { status: 500 })
   }
 
-  // 2-5: Side-effect mutations — log errors but don't fail the request
-  // (the lead is already marked disqualified; these are best-effort cleanup)
-  const warnings: string[] = []
-
-  const { error: seqError } = await supabase
-    .from('outreach_sequences')
-    .update({ status: 'completed', updated_at: now })
-    .eq('lead_id', id)
-    .eq('status', 'active')
-  if (seqError) {
-    console.error('[disqualify] failed to complete sequences:', seqError)
-    warnings.push('Failed to complete outreach sequences')
-  }
-
-  const { error: emailError } = await supabase
-    .from('outreach_emails')
-    .update({ status: 'cancelled', updated_at: now })
-    .eq('lead_id', id)
-    .in('status', ['draft', 'queued'])
-  if (emailError) {
-    console.error('[disqualify] failed to cancel emails:', emailError)
-    warnings.push('Failed to cancel outreach emails')
-  }
-
-  const leadEmail = (lead as { email?: string | null }).email
-  if (leadEmail) {
-    const { error: optOutError } = await supabase
-      .from('email_opt_outs')
-      .upsert({ email: leadEmail.toLowerCase(), opted_out_at: now }, { onConflict: 'email' })
-    if (optOutError) {
-      console.error('[disqualify] failed to add opt-out:', optOutError)
-      warnings.push('Failed to add email opt-out')
-    }
-  }
-
+  // 4. Log activity
   const { error: activityError } = await supabase.from('lead_activities').insert({
     lead_id: id,
     user_id: user.id,

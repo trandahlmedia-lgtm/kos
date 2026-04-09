@@ -2,6 +2,7 @@
 
 import { LayoutGrid, List, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, FlaskConical } from 'lucide-react'
 import { BatchResearchProgress } from './BatchResearchProgress'
+import { DraftProgress } from './DraftProgress'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -312,14 +313,14 @@ export function LeadsToolbar({
           </span>
         )}
 
-        {/* Batch research progress dropdown */}
-        {(batchLeadIds?.length ?? 0) > 0 && onBatchComplete && (
-          <BatchResearchProgress
-            batchLeadIds={batchLeadIds!}
-            onBatchComplete={onBatchComplete}
-            onCancelBatch={onCancelBatch}
-          />
-        )}
+        {/* Research progress dropdown — shows for ALL active research (batch + individual) */}
+        <BatchResearchProgress
+          onAllComplete={onBatchComplete}
+          onCancelBatch={onCancelBatch}
+        />
+
+        {/* Draft progress dropdown — shows when emails are being drafted */}
+        <DraftProgress />
 
         {/* Batch research — size picker */}
         {onBatchResearch && (

@@ -1,6 +1,7 @@
 'use client'
 
-import { Mail } from 'lucide-react'
+import { useState } from 'react'
+import { Mail, ChevronDown, ChevronRight } from 'lucide-react'
 import { EmailCard } from './EmailCard'
 import type { OutreachEmail, OutreachSettings } from '@/types'
 import type { EmailWithLead } from './OutreachPageClient'
@@ -13,14 +14,29 @@ interface ReviewQueueProps {
   onEmailDeleted: (id: string) => void
 }
 
+function getTimeBucket(sentAt: string | null): 'today' | 'thisWeek' | 'earlier' {
+  if (!sentAt) return 'earlier'
+  const sent = new Date(sentAt)
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (sent >= startOfToday) return 'today'
+  const startOfWeek = new Date(startOfToday)
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+  if (sent >= startOfWeek) return 'thisWeek'
+  return 'earlier'
+}
+
 export function ReviewQueue({ emails, sentEmails, settings, onEmailUpdated, onEmailDeleted }: ReviewQueueProps) {
   const sendingEnabled = settings?.sending_enabled ?? false
 
-  // Group emails by lead, sorted by ai_score desc
   const grouped = groupByLead(emails)
-  const sentGrouped = groupByLead(sentEmails)
 
-  if (grouped.length === 0 && sentGrouped.length === 0) {
+  // Split sent emails into time buckets
+  const todaySent = sentEmails.filter((e) => getTimeBucket(e.sent_at) === 'today')
+  const weekSent = sentEmails.filter((e) => getTimeBucket(e.sent_at) === 'thisWeek')
+  const earlierSent = sentEmails.filter((e) => getTimeBucket(e.sent_at) === 'earlier')
+
+  if (grouped.length === 0 && sentEmails.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <Mail size={32} className="text-[#2a2a2a]" />
@@ -54,13 +70,78 @@ export function ReviewQueue({ emails, sentEmails, settings, onEmailUpdated, onEm
         </div>
       )}
 
-      {/* Recently sent */}
-      {sentGrouped.length > 0 && (
-        <div className="space-y-4">
+      {/* Sent — time-segmented */}
+      {sentEmails.length > 0 && (
+        <div className="space-y-3">
           <h3 className="text-xs font-medium text-[#555555] uppercase tracking-wide">
             Sent ({sentEmails.length} emails)
           </h3>
-          {sentGrouped.map((group) => (
+          {todaySent.length > 0 && (
+            <SentBucket
+              label="Today"
+              emails={todaySent}
+              defaultOpen
+              sendingEnabled={sendingEnabled}
+              onEmailUpdated={onEmailUpdated}
+              onEmailDeleted={onEmailDeleted}
+            />
+          )}
+          {weekSent.length > 0 && (
+            <SentBucket
+              label="This Week"
+              emails={weekSent}
+              defaultOpen
+              sendingEnabled={sendingEnabled}
+              onEmailUpdated={onEmailUpdated}
+              onEmailDeleted={onEmailDeleted}
+            />
+          )}
+          {earlierSent.length > 0 && (
+            <SentBucket
+              label="Earlier"
+              emails={earlierSent}
+              defaultOpen={false}
+              sendingEnabled={sendingEnabled}
+              onEmailUpdated={onEmailUpdated}
+              onEmailDeleted={onEmailDeleted}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface SentBucketProps {
+  label: string
+  emails: EmailWithLead[]
+  defaultOpen: boolean
+  sendingEnabled: boolean
+  onEmailUpdated: (email: OutreachEmail) => void
+  onEmailDeleted: (id: string) => void
+}
+
+function SentBucket({ label, emails, defaultOpen, sendingEnabled, onEmailUpdated, onEmailDeleted }: SentBucketProps) {
+  const [open, setOpen] = useState(defaultOpen)
+  const groups = groupByLead(emails)
+
+  return (
+    <div className="border border-[#2a2a2a] rounded-md overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-[#111111] hover:bg-[#161616] transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {open ? <ChevronDown size={14} className="text-[#555555]" /> : <ChevronRight size={14} className="text-[#555555]" />}
+          <span className="text-xs font-medium text-[#999999]">{label}</span>
+        </div>
+        <span className="text-[10px] text-[#555555] bg-[#1a1a1a] border border-[#2a2a2a] rounded px-1.5 py-0.5">
+          {emails.length}
+        </span>
+      </button>
+      {open && (
+        <div className="p-3 space-y-4">
+          {groups.map((group) => (
             <LeadEmailGroup
               key={group.leadId}
               leadName={group.leadName}

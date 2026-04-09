@@ -122,7 +122,7 @@ export async function bulkImportLeads(
     const data = result.data
 
     // Check if this lead was previously disqualified (by email or fuzzy business name+area)
-    const rowEmail = data.email?.toLowerCase()
+    const rowEmail = data.email?.toLowerCase().trim()
     const rowNameAreaKey = `${normalizeBusinessName(data.business_name)}|${(data.service_area ?? '').toLowerCase().trim()}`
     if (
       (rowEmail && (optOutEmails.has(rowEmail) || disqualifiedEmails.has(rowEmail))) ||

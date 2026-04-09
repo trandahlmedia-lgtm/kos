@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScoreDisplay } from './ScoreDisplay'
 import type { Lead, LeadStage, LeadSource } from '@/types'
 
@@ -39,14 +40,19 @@ export function LeadOverviewTab({ lead, onUpdate, onStageChange }: LeadOverviewT
   const [showLostReason, setShowLostReason] = useState(false)
   const [manualScore, setManualScore] = useState<number | null>(lead.manual_score)
 
-  async function handleStageChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newStage = e.target.value as LeadStage
+  async function handleStageChange(newStage: LeadStage) {
+    console.log('[STAGE-DEBUG] handleStageChange fired:', { newStage, currentStage: lead.stage })
     if (newStage === 'lost') {
       setShowLostReason(true)
       return
     }
     setStageSaving(true)
-    await onStageChange(newStage)
+    try {
+      await onStageChange(newStage)
+      console.log('[STAGE-DEBUG] onStageChange completed successfully')
+    } catch (err) {
+      console.error('[STAGE-DEBUG] onStageChange threw:', err)
+    }
     setStageSaving(false)
   }
 
@@ -78,16 +84,22 @@ export function LeadOverviewTab({ lead, onUpdate, onStageChange }: LeadOverviewT
         <div className="flex-1 space-y-1">
           <Label className="text-xs text-[#555555]">Stage</Label>
           <div className="flex items-center gap-2">
-            <select
+            <Select
               value={lead.stage}
-              onChange={handleStageChange}
+              onValueChange={(val) => handleStageChange(val as LeadStage)}
               disabled={stageSaving}
-              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-md text-sm text-white px-2 py-1.5 focus:outline-none focus:border-[#E8732A] disabled:opacity-50"
             >
-              {STAGE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+              <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] text-sm text-white h-8 w-[160px] focus:ring-[#E8732A] disabled:opacity-50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+                {STAGE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value} className="text-sm text-white focus:bg-[#2a2a2a] focus:text-white">
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {stageSaving && <Loader2 size={12} className="animate-spin text-[#555555]" />}
           </div>
         </div>
@@ -141,15 +153,21 @@ export function LeadOverviewTab({ lead, onUpdate, onStageChange }: LeadOverviewT
       {/* Source */}
       <div className="space-y-1">
         <Label className="text-xs text-[#555555]">Source</Label>
-        <select
+        <Select
           defaultValue={lead.source}
-          onBlur={(e) => handleFieldBlur('source', e.target.value)}
-          className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-md text-sm text-white px-2 py-1.5 focus:outline-none focus:border-[#E8732A] w-full"
+          onValueChange={(val) => handleFieldBlur('source', val)}
         >
-          {SOURCE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+          <SelectTrigger className="bg-[#1a1a1a] border-[#2a2a2a] text-sm text-white h-8 w-full focus:ring-[#E8732A]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-[#1a1a1a] border-[#2a2a2a]">
+            {SOURCE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value} className="text-sm text-white focus:bg-[#2a2a2a] focus:text-white">
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Social handles */}

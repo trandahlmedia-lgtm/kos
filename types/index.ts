@@ -345,6 +345,7 @@ export interface OutreachSequence {
 export interface EmailOptOut {
   email: string
   opted_out_at: string
+  source: 'disqualify' | 'unsubscribe'
 }
 
 export interface OutreachSettings {

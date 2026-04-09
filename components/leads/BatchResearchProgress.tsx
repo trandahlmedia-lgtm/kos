@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Loader2, CheckCircle2, XCircle, Circle, ChevronDown, Ban } from 'lucide-react'
 
 interface BatchItem {
@@ -12,7 +12,7 @@ interface BatchItem {
   steps: Record<string, 'complete' | 'running' | 'pending'>
 }
 
-interface BatchStatusResponse {
+interface ActiveStatusResponse {
   items: BatchItem[]
 }
 
@@ -28,49 +28,48 @@ const STEP_LABELS: Record<string, string> = {
 const STEP_ORDER = ['website_audit', 'social_audit', 'business_intel', 'service_fit', 'pricing_analysis', 'synthesis']
 
 interface BatchResearchProgressProps {
-  batchLeadIds: string[]
-  onBatchComplete: () => void
+  onAllComplete?: () => void
   onCancelBatch?: () => void
 }
 
-export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelBatch }: BatchResearchProgressProps) {
+export function BatchResearchProgress({ onAllComplete, onCancelBatch }: BatchResearchProgressProps) {
   const [items, setItems] = useState<BatchItem[]>([])
   const [open, setOpen] = useState(true)
+  const [visible, setVisible] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const wasActiveRef = useRef(false)
 
-  // Poll for batch status — AbortController ensures stale responses are discarded
+  const handleAllComplete = useCallback(() => {
+    onAllComplete?.()
+  }, [onAllComplete])
+
+  // Poll for ALL active research
   useEffect(() => {
-    if (batchLeadIds.length === 0) return
     const controller = new AbortController()
     let localTimerId: number
-    let isFirstPoll = true
+
     const pollFn = async () => {
       if (controller.signal.aborted) return
-      // Reset state on first poll of a new batch
-      if (isFirstPoll) {
-        isFirstPoll = false
-        setItems([])
-        setOpen(true)
-      }
       try {
-        const res = await fetch(
-          `/api/ai/lead-research/batch-status?lead_ids=${batchLeadIds.join(',')}`,
-          { signal: controller.signal }
-        )
+        const res = await fetch('/api/ai/lead-research/active-status', {
+          signal: controller.signal,
+        })
         if (controller.signal.aborted) return
         if (res.ok) {
-          const data = await res.json() as BatchStatusResponse
+          const data = await res.json() as ActiveStatusResponse
           if (controller.signal.aborted) return
-          setItems(data.items)
-          const allDone = data.items.every(
-            (item) => item.status === 'completed' || item.status === 'failed' || item.status === 'none'
-          )
-          if (allDone && data.items.some((item) => item.status === 'completed' || item.status === 'failed')) {
-            onBatchComplete()
-            return
+
+          if (data.items.length > 0) {
+            setItems(data.items)
+            setVisible(true)
+            wasActiveRef.current = true
+          } else if (wasActiveRef.current) {
+            // Was active, now everything is done
+            setVisible(false)
+            wasActiveRef.current = false
+            handleAllComplete()
           }
         } else if (res.status === 401 || res.status === 403) {
-          // Terminal auth error - stop polling
           return
         }
       } catch {
@@ -80,12 +79,13 @@ export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelB
         localTimerId = window.setTimeout(pollFn, 2000) as unknown as number
       }
     }
-    localTimerId = window.setTimeout(pollFn, 300) as unknown as number
+
+    localTimerId = window.setTimeout(pollFn, 500) as unknown as number
     return () => {
       controller.abort()
       window.clearTimeout(localTimerId)
     }
-  }, [batchLeadIds, onBatchComplete])
+  }, [handleAllComplete])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -98,13 +98,12 @@ export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelB
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
-  if (batchLeadIds.length === 0) return null
+  if (!visible || items.length === 0) return null
 
   const completedCount = items.filter((i) => i.status === 'completed').length
   const failedCount = items.filter((i) => i.status === 'failed').length
-  const totalCount = batchLeadIds.length
-  // Treat as running when items haven't loaded yet (before first poll) or have active items
-  const isRunning = items.length === 0 || items.some((i) => i.status === 'running' || i.status === 'pending')
+  const totalCount = items.length
+  const isRunning = items.some((i) => i.status === 'running' || i.status === 'pending')
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -128,7 +127,7 @@ export function BatchResearchProgress({ batchLeadIds, onBatchComplete, onCancelB
           {/* Header */}
           <div className="px-3 py-2 border-b border-[#2a2a2a] flex items-center justify-between">
             <p className="text-xs font-medium text-white">
-              Batch Research — {completedCount + failedCount} of {totalCount}
+              Research — {completedCount + failedCount} of {totalCount}
             </p>
             {isRunning && onCancelBatch && (
               <button

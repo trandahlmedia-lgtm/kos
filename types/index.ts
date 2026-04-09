@@ -12,6 +12,9 @@ export type EmailTemplateType = 'initial' | 'followup_1' | 'followup_2' | 'follo
 export type SequenceStatus = 'active' | 'paused' | 'completed' | 'opted_out'
 export type PriorityTag = 'revenue' | 'delivery' | 'admin' | 'growth'
 export type LeadActivityType = 'call' | 'note' | 'stage_change' | 'research_run' | 'conversion' | 'email_drafted' | 'email_sent'
+export type PostFormat = 'carousel' | 'static'
+export type PostPlacement = 'feed' | 'story'
+export type VisualExportStatus = 'pending' | 'photos_needed' | 'ready_to_export' | 'exported'
 export type MediaType = 'image' | 'video' | 'document' | 'audio'
 export type MediaCategory = 'brand_asset' | 'creative' | 'footage' | 'export' | 'other'
 export type AIWorkflow = 'content_calendar' | 'captions' | 'scripts' | 'design_brief' | 'lead_research' | 'analytics_report' | 'generate_claude_md' | 'platform_bios' | 'client_intake'
@@ -125,6 +128,8 @@ export interface Post {
   cross_post_platforms: Platform[]
   content_type?: ContentType
   status: PostStatus
+  format: PostFormat
+  placement: PostPlacement
   caption?: string
   selected_caption_id?: string
   cta?: string
@@ -150,6 +155,7 @@ export interface Post {
   updated_at: string
   captions?: Caption[]
   media?: Media[]
+  visual?: PostVisual
 }
 
 export interface Caption {
@@ -250,6 +256,75 @@ export interface AIRun {
 }
 
 // ---------------------------------------------------------------------------
+// Visual engine types
+// ---------------------------------------------------------------------------
+
+export interface PhotoSlot {
+  slot_id: string
+  label: string
+  description: string
+  has_photo: boolean
+  base64_data?: string
+  mime_type?: string
+}
+
+export interface ColorPalette {
+  brand_primary: string
+  brand_light: string
+  brand_dark: string
+  light_bg: string
+  light_border: string
+  dark_bg: string
+}
+
+export interface FontPair {
+  heading: string
+  body: string
+}
+
+export interface SlideContent {
+  index: number
+  layout_type: string
+  background: 'light' | 'dark' | 'gradient'
+  tag_label?: string
+  heading: string
+  body?: string
+  stat?: { number: string; label: string }
+  features?: Array<{ icon: string; label: string; description: string }>
+  steps?: Array<{ number: string; title: string; description: string }>
+  quote?: string
+  comparison?: { left: { label: string; items: string[] }; right: { label: string; items: string[] } }
+  photo_slots?: PhotoSlot[]
+  cta?: { text: string; subtitle?: string }
+  has_arrow: boolean
+}
+
+export interface CreativeBrief {
+  slides: SlideContent[]
+  caption: string
+  hashtags: string
+  cta_text: string
+}
+
+export interface PostVisual {
+  id: string
+  post_id: string
+  client_id: string
+  generated_html: string | null
+  creative_brief: CreativeBrief | null
+  layout_recipe: string[] | null
+  slide_count: number | null
+  color_palette: ColorPalette | null
+  photo_slots: PhotoSlot[] | null
+  font_pair: FontPair | null
+  export_status: VisualExportStatus
+  exported_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ---------------------------------------------------------------------------
 // AI Workflow response types
 // ---------------------------------------------------------------------------
 
@@ -259,7 +334,8 @@ export interface WeeklyPlanPost {
   platform: Platform
   cross_post_platforms: Platform[]
   content_type: ContentType
-  format: 'static' | 'reel' | 'story'
+  format: PostFormat
+  placement: PostPlacement
   angle: string
   visual_direction: string
   caption_brief: string

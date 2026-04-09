@@ -5,7 +5,7 @@ import { callClaude, extractJSON, MODEL } from '@/lib/ai/claude'
 import { logAIRun } from '@/lib/ai/costTracker'
 import { checkRateLimit, userAction, LIMITS } from '@/lib/security/rateLimit'
 import { WEEKLY_PLAN_SYSTEM, buildWeeklyPlanPrompt } from '@/lib/ai/prompts/weeklyPlan'
-import type { Platform, ContentType } from '@/types'
+import type { Platform, ContentType, PostFormat, PostPlacement } from '@/types'
 
 const requestSchema = z.object({
   clientId: z.string().uuid(),
@@ -18,7 +18,8 @@ interface PlannedPost {
   platform: Platform
   cross_post_platforms: Platform[]
   content_type: ContentType
-  format: 'static' | 'reel' | 'story'
+  format: PostFormat
+  placement: PostPlacement
   angle: string
   caption_brief: string
   ai_reasoning: string
@@ -29,6 +30,8 @@ const VALID_CONTENT_TYPES = new Set<string>([
   'offer', 'seasonal', 'trust', 'differentiator',
   'social_proof', 'education', 'bts', 'before_after',
 ])
+const VALID_FORMATS = new Set<string>(['carousel', 'static'])
+const VALID_PLACEMENTS = new Set<string>(['feed', 'story'])
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -137,6 +140,8 @@ export async function POST(request: Request) {
         client_id: clientId,
         platform: p.platform as Platform,
         content_type: p.content_type as ContentType,
+        format: VALID_FORMATS.has(p.format) ? p.format : 'static',
+        placement: VALID_PLACEMENTS.has(p.placement) ? p.placement : 'feed',
         status: 'slot' as const,
         scheduled_date: p.scheduled_date,
         scheduled_time: p.scheduled_time ?? null,

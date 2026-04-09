@@ -3,7 +3,10 @@
     "allow": [
       "Read(//c/HQ/**)",
       "Read(//c/HQ/Business/**)",
-      "Read(//c//**)"
+      "Read(//c//**)",
+      "Bash(npm run:*)",
+      "Skill(codex:rescue)",
+      "Skill(codex:rescue:*)"
     ]
   }
 }

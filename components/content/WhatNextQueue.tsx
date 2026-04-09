@@ -16,6 +16,7 @@ interface WhatNextQueueProps {
   onPostClick: (post: Post) => void
   onRefresh: () => void
   onNewPost: () => void
+  onPreviewVisual?: (postId: string) => void
 }
 
 export function WhatNextQueue({
@@ -26,6 +27,7 @@ export function WhatNextQueue({
   onPostClick,
   onRefresh,
   onNewPost,
+  onPreviewVisual,
 }: WhatNextQueueProps) {
   const clientMap = Object.fromEntries(clients.map((c) => [c.id, c.name]))
   const profileMap = Object.fromEntries(profiles.map((p) => [p.id, p.name]))
@@ -82,6 +84,7 @@ export function WhatNextQueue({
         signedUrlMap={signedUrlMap}
         onPostClick={onPostClick}
         onRefresh={onRefresh}
+        onPreviewVisual={onPreviewVisual}
         emptyText="No posts waiting on a caption."
       />
 
@@ -94,6 +97,7 @@ export function WhatNextQueue({
         signedUrlMap={signedUrlMap}
         onPostClick={onPostClick}
         onRefresh={onRefresh}
+        onPreviewVisual={onPreviewVisual}
         emptyText="No posts waiting on a creative."
       />
 
@@ -106,6 +110,7 @@ export function WhatNextQueue({
         signedUrlMap={signedUrlMap}
         onPostClick={onPostClick}
         onRefresh={onRefresh}
+        onPreviewVisual={onPreviewVisual}
         emptyText="Nothing approved or scheduled yet."
       />
 
@@ -118,6 +123,7 @@ export function WhatNextQueue({
         signedUrlMap={signedUrlMap}
         onPostClick={onPostClick}
         onRefresh={onRefresh}
+        onPreviewVisual={onPreviewVisual}
         emptyText="Nothing published in the last 7 days."
         muted
       />
@@ -134,6 +140,7 @@ interface QueueSectionProps {
   signedUrlMap: Record<string, string>
   onPostClick: (post: Post) => void
   onRefresh: () => void
+  onPreviewVisual?: (postId: string) => void
   emptyText: string
   muted?: boolean
 }
@@ -147,6 +154,7 @@ function QueueSection({
   signedUrlMap,
   onPostClick,
   onRefresh,
+  onPreviewVisual,
   emptyText,
   muted,
 }: QueueSectionProps) {
@@ -187,6 +195,7 @@ function QueueSection({
               thumbnailUrl={getThumbnailUrl(post)}
               onClick={() => onPostClick(post)}
               onRefresh={onRefresh}
+              onPreviewVisual={onPreviewVisual}
             />
           ))}
         </div>

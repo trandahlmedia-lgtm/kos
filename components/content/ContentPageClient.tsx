@@ -8,6 +8,7 @@ import { WhatNextQueue } from './WhatNextQueue'
 import { WeeklyCalendar, DayView } from './WeeklyCalendar'
 import { SchedulePanel } from './SchedulePanel'
 import { PostDialog } from './PostDialog'
+import { VisualPreviewModal } from './VisualPreviewModal'
 import { type Post, type Client } from '@/types'
 
 interface ContentPageClientProps {
@@ -41,6 +42,10 @@ export function ContentPageClient({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [postDialogOpen, setPostDialogOpen] = useState(false)
   const [newPostDefaults, setNewPostDefaults] = useState<{ clientId?: string; date?: string }>({})
+
+  // Visual preview modal state
+  const [visualPreviewPostId, setVisualPreviewPostId] = useState<string | null>(null)
+  const isPreviewModalOpen = !!visualPreviewPostId
 
   // Generate week state
   const [generating, setGenerating] = useState(false)
@@ -282,6 +287,7 @@ export function ContentPageClient({
           onPostClick={(post) => setSelectedPostId(post.id)}
           onRefresh={handleRefresh}
           onNewPost={() => openNewPost(selectedClientId !== 'all' ? selectedClientId : undefined)}
+          onPreviewVisual={(postId) => setVisualPreviewPostId(postId)}
         />
       ) : calView === 'week' ? (
         <WeeklyCalendar
@@ -322,6 +328,26 @@ export function ContentPageClient({
         clients={clients}
         profiles={profiles}
       />
+
+      {/* Visual preview modal */}
+      {visualPreviewPostId && (
+        <VisualPreviewModal
+          postId={visualPreviewPostId}
+          postMeta={(() => {
+            const p = posts.find((post) => post.id === visualPreviewPostId)
+            if (!p) return undefined
+            return {
+              clientName: clients.find((c) => c.id === p.client_id)?.name,
+              contentType: p.content_type,
+              format: p.format,
+              placement: p.placement,
+              angle: p.angle,
+            }
+          })()}
+          isOpen={isPreviewModalOpen}
+          onClose={() => setVisualPreviewPostId(null)}
+        />
+      )}
     </div>
   )
 }

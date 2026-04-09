@@ -11,6 +11,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { PostStatusBadge } from '@/components/shared/StatusBadge'
 import { PlatformIcon } from '@/components/shared/PlatformIcon'
+import { GenerateVisualButton } from './GenerateVisualButton'
+import { VisualStatusBadge } from './VisualStatusBadge'
 import { deletePostAction, updatePostStatusAction } from '@/lib/actions/posts'
 import { type Post } from '@/types'
 
@@ -32,6 +34,17 @@ interface PostCardProps {
   thumbnailUrl?: string
   onClick: () => void
   onRefresh: () => void
+  onPreviewVisual?: (postId: string) => void
+}
+
+const FORMAT_LABELS: Record<string, string> = {
+  carousel: 'Carousel',
+  static: 'Static',
+}
+
+const PLACEMENT_LABELS: Record<string, string> = {
+  feed: 'Feed',
+  story: 'Story',
 }
 
 export function PostCard({
@@ -41,6 +54,7 @@ export function PostCard({
   thumbnailUrl,
   onClick,
   onRefresh,
+  onPreviewVisual,
 }: PostCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -83,6 +97,16 @@ export function PostCard({
           {post.content_type && (
             <span className="text-xs text-[#555555]">
               {CONTENT_TYPE_LABELS[post.content_type] ?? post.content_type}
+            </span>
+          )}
+          {post.format && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-medium text-[#999999] bg-[#1a1a1a] border border-[#2a2a2a]">
+              {FORMAT_LABELS[post.format] ?? post.format}
+            </span>
+          )}
+          {post.placement && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-medium text-[#999999] bg-[#1a1a1a] border border-[#2a2a2a]">
+              {PLACEMENT_LABELS[post.placement] ?? post.placement}
             </span>
           )}
         </div>
@@ -159,6 +183,18 @@ export function PostCard({
           {post.ai_reasoning}
         </p>
       )}
+
+      {/* Visual generate / preview */}
+      <div className="flex items-center gap-2 mb-2">
+        <GenerateVisualButton
+          postId={post.id}
+          hasVisual={!!post.visual}
+          exportStatus={post.visual?.export_status}
+          onPreview={() => onPreviewVisual?.(post.id)}
+          onRefresh={onRefresh}
+        />
+        <VisualStatusBadge status={post.visual?.export_status} />
+      </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#2a2a2a]">

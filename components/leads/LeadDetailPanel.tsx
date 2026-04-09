@@ -19,6 +19,7 @@ interface LeadDetailData {
   research: LeadResearch | null
   activities: LeadActivity[]
   hasOutreachDrafts?: boolean
+  draftingInProgress?: boolean
 }
 
 interface LeadDetailPanelProps {
@@ -181,9 +182,12 @@ export function LeadDetailPanel({
           ) : (
             <>
               <SheetHeader className="px-5 py-4 border-b border-[#2a2a2a] shrink-0">
-                <div className="flex items-start gap-3">
-                  <SheetTitle className="text-white text-base leading-tight min-w-0 truncate">{lead.business_name}</SheetTitle>
-                  <div className="flex items-center gap-1 shrink-0 ml-auto">
+                <SheetTitle className="sr-only">{lead.business_name}</SheetTitle>
+                <div className="flex items-center gap-3 w-full">
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <p className="truncate text-white text-base font-semibold">{lead.business_name}</p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-none">
                     {isWon && (
                       <Button
                         size="sm"
@@ -269,6 +273,7 @@ export function LeadDetailPanel({
                       leadEmail={lead.email}
                       aiScore={lead.ai_score}
                       hasExistingDrafts={data?.hasOutreachDrafts}
+                      draftingInProgress={data?.draftingInProgress}
                       research={data?.research ?? null}
                       onResearchComplete={fetchData}
                     />

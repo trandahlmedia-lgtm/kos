@@ -13,11 +13,12 @@ interface LeadResearchTabProps {
   leadEmail?: string | null
   aiScore?: number | null
   hasExistingDrafts?: boolean
+  draftingInProgress?: boolean
   research: LeadResearch | null
   onResearchComplete: () => void
 }
 
-export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExistingDrafts, research, onResearchComplete }: LeadResearchTabProps) {
+export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExistingDrafts, draftingInProgress, research, onResearchComplete }: LeadResearchTabProps) {
   // Auto-detect in-progress research on mount
   const alreadyRunning = research?.status === 'running'
   const [running, setRunning] = useState(alreadyRunning)
@@ -183,6 +184,7 @@ export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExist
           hasEmail={!!leadEmail}
           aiScore={aiScore ?? research.overall_score}
           hasExistingDrafts={hasExistingDrafts}
+          draftingInProgress={draftingInProgress}
         />
       )}
 

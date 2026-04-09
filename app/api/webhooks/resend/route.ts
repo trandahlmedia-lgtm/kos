@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { adminClient } from '@/lib/supabase/admin'
 
 // Resend webhook — no auth (verified by signature)
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
       }
 
       // Safety net: atomic stage update for initial emails only (send action may have failed)
+      console.log('[AUTO-STAGE][webhook] Checking lead stage update', { leadId: email.lead_id, followUpNumber: email.follow_up_number })
       if (email.follow_up_number === 0) {
         const { data: updated } = await adminClient
           .from('leads')
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
           .select('id')
 
         if (updated && updated.length > 0) {
+          console.log('[AUTO-STAGE][webhook] Lead updated to reached_out', { leadId: email.lead_id })
           await adminClient.from('lead_activities').insert({
             lead_id: email.lead_id,
             user_id: null,
@@ -87,6 +90,8 @@ export async function POST(request: Request) {
             metadata: { to_stage: 'reached_out', trigger: 'auto', reason: 'first_outreach_email_sent', email_id: email.id, source: 'webhook_fallback' },
           })
         }
+
+        revalidatePath('/leads')
       }
       break
     }

@@ -62,15 +62,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Lead has no email address. Add an email before drafting outreach.' }, { status: 400 })
   }
 
-  // Check if emails already exist for this lead
-  const { count } = await supabase
+  // Check if emails already exist or are being generated for this lead
+  const { data: existingEmails } = await supabase
     .from('outreach_emails')
-    .select('id', { count: 'exact', head: true })
+    .select('id, subject, created_at')
     .eq('lead_id', lead_id)
 
-  if (count && count > 0) {
-    return NextResponse.json({ error: 'Outreach emails already exist for this lead. Delete existing drafts to regenerate.' }, { status: 409 })
+  if (existingEmails && existingEmails.length > 0) {
+    // Auto-clean stale placeholders (empty subject, older than 2 min) from a previous failed generation
+    const STALE_MS = 2 * 60 * 1000
+    const allEmpty = existingEmails.every((e) => e.subject === '')
+    const allStale = existingEmails.every((e) => Date.now() - new Date(e.created_at).getTime() > STALE_MS)
+
+    if (allEmpty && allStale) {
+      await supabase
+        .from('outreach_emails')
+        .delete()
+        .in('id', existingEmails.map((e) => e.id))
+    } else {
+      return NextResponse.json({ error: 'Outreach emails already exist for this lead. Delete existing drafts to regenerate.' }, { status: 409 })
+    }
   }
+
+  // Insert placeholder rows BEFORE calling Claude to prevent duplicate generation.
+  // If the panel is closed and reopened while drafting, these rows signal "in progress."
+  const placeholderRows = TEMPLATE_TYPES.map((type, idx) => ({
+    lead_id,
+    subject: '',
+    body_html: '',
+    body_text: '',
+    status: 'draft' as const,
+    template_type: type,
+    follow_up_number: idx,
+    created_by: user.id,
+  }))
+
+  const { data: placeholders, error: placeholderErr } = await supabase
+    .from('outreach_emails')
+    .insert(placeholderRows)
+    .select('id, template_type')
+
+  if (placeholderErr || !placeholders) {
+    // Unique constraint violation (23505) = another request beat us; otherwise unexpected
+    const isConstraintViolation = placeholderErr?.code === '23505'
+    console.error('[outreach-draft] Placeholder insert error:', placeholderErr)
+    return NextResponse.json(
+      { error: isConstraintViolation
+          ? 'Outreach emails already exist or are being generated for this lead.'
+          : 'Failed to reserve email slots' },
+      { status: isConstraintViolation ? 409 : 500 }
+    )
+  }
+
+  const placeholderIds = placeholders.map((p) => p.id)
 
   // Extract findings from research
   const websiteAudit = research.website_audit as Record<string, unknown> | null
@@ -118,27 +162,28 @@ export async function POST(request: Request) {
       }
     }
 
-    // Insert all 4 emails
-    const emailRows = TEMPLATE_TYPES.map((type, idx) => ({
-      lead_id,
-      subject: sequence[type].subject,
-      body_html: sequence[type].body_html || '',
-      body_text: sequence[type].body_text,
-      status: 'draft',
-      template_type: type,
-      follow_up_number: idx,
-      created_by: user.id,
-    }))
+    // Update placeholder rows with generated content
+    const updatePromises = placeholders.map((p) => {
+      const content = sequence[p.template_type]
+      return supabase
+        .from('outreach_emails')
+        .update({
+          subject: content.subject,
+          body_html: content.body_html || '',
+          body_text: content.body_text,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', p.id)
+    })
 
-    const { data: emails, error: insertErr } = await supabase
+    await Promise.all(updatePromises)
+
+    // Re-fetch completed emails
+    const { data: emails } = await supabase
       .from('outreach_emails')
-      .insert(emailRows)
-      .select()
-
-    if (insertErr) {
-      console.error('[outreach-draft] Insert error:', insertErr)
-      return NextResponse.json({ error: 'Failed to save email drafts' }, { status: 500 })
-    }
+      .select('*')
+      .in('id', placeholderIds)
+      .order('follow_up_number', { ascending: true })
 
     // Log activity
     await supabase.from('lead_activities').insert({
@@ -164,6 +209,12 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[outreach-draft] Error:', message)
+
+    // Clean up placeholder rows on failure
+    await supabase
+      .from('outreach_emails')
+      .delete()
+      .in('id', placeholderIds)
 
     await logAIRun({
       supabase,

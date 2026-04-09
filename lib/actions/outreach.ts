@@ -86,6 +86,7 @@ export async function getOutreachEmails(params?: {
   let query = supabase
     .from('outreach_emails')
     .select('*')
+    .neq('subject', '')  // Exclude placeholder rows (in-progress generation)
     .order('follow_up_number', { ascending: true })
     .order('created_at', { ascending: false })
 

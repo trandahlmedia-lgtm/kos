@@ -12,6 +12,7 @@ interface GenerateDraftsButtonProps {
   aiScore: number | null
   scoreThreshold?: number
   hasExistingDrafts?: boolean
+  draftingInProgress?: boolean
 }
 
 export function GenerateDraftsButton({
@@ -22,6 +23,7 @@ export function GenerateDraftsButton({
   aiScore,
   scoreThreshold = 60,
   hasExistingDrafts = false,
+  draftingInProgress = false,
 }: GenerateDraftsButtonProps) {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,6 +62,15 @@ export function GenerateDraftsButton({
       <div className="flex items-center gap-2 text-green-400 text-sm p-3 bg-green-400/5 border border-green-400/20 rounded-md">
         <Check size={14} />
         Outreach emails drafted for {leadName}. Review them in the Outreach page.
+      </div>
+    )
+  }
+
+  if (draftingInProgress) {
+    return (
+      <div className="flex items-center gap-2 text-[#E8732A] text-xs">
+        <Loader2 size={12} className="animate-spin" />
+        Drafting in progress...
       </div>
     )
   }

@@ -38,18 +38,30 @@ export async function GET(
     supabase.from('leads').select('*').eq('id', id).single(),
     supabase.from('lead_research').select('*').eq('lead_id', id).single(),
     supabase.from('lead_activities').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
-    supabase.from('outreach_emails').select('id', { count: 'exact', head: true }).eq('lead_id', id),
+    supabase.from('outreach_emails').select('id, subject, created_at', { count: 'exact' }).eq('lead_id', id),
   ])
 
   if (leadResult.error || !leadResult.data) {
     return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
   }
 
+  const outreachEmails = outreachResult.data ?? []
+  const hasOutreachDrafts = outreachEmails.length > 0
+  // Placeholder rows inserted during generation have empty subjects.
+  // If placeholders are older than 2 minutes, treat as stale (generation failed/died).
+  const STALE_MS = 2 * 60 * 1000
+  const allEmpty = outreachEmails.every((e: { subject: string }) => e.subject === '')
+  const anyFresh = outreachEmails.some((e: { created_at: string }) =>
+    Date.now() - new Date(e.created_at).getTime() < STALE_MS
+  )
+  const draftingInProgress = hasOutreachDrafts && allEmpty && anyFresh
+
   return NextResponse.json({
     lead: leadResult.data,
     research: researchResult.data ?? null,
     activities: activitiesResult.data ?? [],
-    hasOutreachDrafts: (outreachResult.count ?? 0) > 0,
+    hasOutreachDrafts,
+    draftingInProgress,
   })
 }
 

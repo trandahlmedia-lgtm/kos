@@ -39,6 +39,11 @@ interface LeadsPageClientProps {
 
 export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
+
+  // Sync server-provided leads when they change (e.g. after revalidatePath)
+  useEffect(() => {
+    setLeads(initialLeads)
+  }, [initialLeads])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [newLeadOpen, setNewLeadOpen] = useState(false)

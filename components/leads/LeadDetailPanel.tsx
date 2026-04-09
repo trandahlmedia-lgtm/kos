@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Trash2, UserCheck, Ban, RotateCcw } from 'lucide-react'
+import { Trash2, UserCheck, Ban, RotateCcw, X } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -157,6 +157,7 @@ export function LeadDetailPanel({
       <Sheet open={open} onOpenChange={(o) => { if (!o) onClose() }}>
         <SheetContent
           side="right"
+          showCloseButton={false}
           className="bg-[#111111] border-l border-[#2a2a2a] w-[480px] sm:w-[520px] p-0 flex flex-col"
         >
           {loading ? (
@@ -229,6 +230,15 @@ export function LeadDetailPanel({
                       className="h-7 w-7 p-0 text-[#555555] hover:text-red-400"
                     >
                       <Trash2 size={14} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onClose}
+                      aria-label="Close"
+                      className="h-7 w-7 p-0 text-[#555555] hover:text-white"
+                    >
+                      <X size={14} />
                     </Button>
                   </div>
                 </div>

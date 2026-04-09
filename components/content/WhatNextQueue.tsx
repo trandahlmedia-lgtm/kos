@@ -34,6 +34,12 @@ export function WhatNextQueue({
 
   const sevenDaysAgo = getSevenDaysAgo()
 
+  // A post has complete creative if media was uploaded OR a visual is ready
+  // (visuals still needing photos are not considered complete)
+  const hasCompleteCreative = (p: Post) =>
+    p.has_creative ||
+    (!!p.visual && p.visual.export_status !== 'photos_needed')
+
   // Group posts into queue sections (mutually exclusive, priority order)
   const needsCaption = posts.filter(
     (p) => !p.caption?.trim() && p.status !== 'published'
@@ -41,15 +47,15 @@ export function WhatNextQueue({
   const needsCreative = posts.filter(
     (p) =>
       p.caption?.trim() &&
-      !p.has_creative &&
+      !hasCompleteCreative(p) &&
       p.status !== 'published'
   )
-  // Include in_production posts that have both caption and creative — they
-  // have no remaining blockers and belong in this queue, not a dead zone.
+  // Include in_production posts that have both caption and complete creative —
+  // they have no remaining blockers and belong in this queue, not a dead zone.
   const readyToPublish = posts.filter(
     (p) =>
       p.caption?.trim() &&
-      p.has_creative &&
+      hasCompleteCreative(p) &&
       (p.status === 'ready' || p.status === 'scheduled' || p.status === 'in_production')
   )
   const publishedThisWeek = posts.filter(

@@ -39,6 +39,8 @@ const csp = [
   `connect-src 'self' ${supabaseHost} ${supabaseWss}`,
   // Allow data: URIs for generated thumbnails; blob: for file previews.
   "img-src 'self' data: blob:",
+  // Allow blob: iframes for the visual preview modal (carousel HTML rendered via blob URL).
+  "frame-src 'self' blob:",
   // Block all plugin/object embeds (Flash, Java applets, etc.).
   "object-src 'none'",
   // Prevents <base> tag injection from changing all relative link targets.

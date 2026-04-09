@@ -14,7 +14,7 @@ import { PlatformIcon } from '@/components/shared/PlatformIcon'
 import { GenerateVisualButton } from './GenerateVisualButton'
 import { VisualStatusBadge } from './VisualStatusBadge'
 import { deletePostAction, updatePostStatusAction } from '@/lib/actions/posts'
-import { type Post } from '@/types'
+import { type Post, type SlideContent, type ColorPalette } from '@/types'
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   offer: 'Offer',
@@ -155,6 +155,13 @@ export function PostCard({
               className="w-full h-full object-cover"
             />
           </div>
+        ) : post.visual?.creative_brief?.slides?.[0] ? (
+          // Generated visual — static first-slide preview (clickable to open modal)
+          <VisualThumbnail
+            slide={post.visual.creative_brief.slides[0]}
+            palette={post.visual.color_palette}
+            onClick={() => onPreviewVisual?.(post.id)}
+          />
         ) : post.has_creative ? (
           // Has creative but no thumbnail yet (e.g., video)
           <div className="w-full h-24 rounded bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
@@ -220,6 +227,63 @@ export function PostCard({
         )}
       </div>
     </div>
+  )
+}
+
+// Static preview of a generated visual's first slide — lightweight alternative to iframe
+function VisualThumbnail({
+  slide,
+  palette,
+  onClick,
+}: {
+  slide: SlideContent
+  palette: ColorPalette | null
+  onClick: () => void
+}) {
+  const bgColor = slide.background === 'dark'
+    ? (palette?.dark_bg ?? '#1a1a1a')
+    : slide.background === 'light'
+    ? (palette?.light_bg ?? '#f5f5f5')
+    : (palette?.brand_primary ?? '#E8732A')
+  const textColor = slide.background === 'light' ? '#111111' : '#ffffff'
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      className="w-full h-24 rounded overflow-hidden cursor-pointer border border-[#2a2a2a] hover:border-[#555555] focus:outline-none focus:ring-1 focus:ring-[#E8732A] transition-colors relative text-left"
+      style={{ backgroundColor: bgColor }}
+      aria-label="Preview generated visual"
+    >
+      <div className="p-2 h-full flex flex-col justify-center">
+        {slide.tag_label && (
+          <span
+            className="text-[8px] font-bold uppercase tracking-wider mb-0.5 opacity-80"
+            style={{ color: palette?.brand_primary ?? '#E8732A' }}
+          >
+            {slide.tag_label}
+          </span>
+        )}
+        <p
+          className="text-[10px] font-bold leading-tight line-clamp-2"
+          style={{ color: textColor }}
+        >
+          {slide.heading}
+        </p>
+        {slide.body && (
+          <p
+            className="text-[8px] leading-tight mt-0.5 opacity-70 line-clamp-1"
+            style={{ color: textColor }}
+          >
+            {slide.body}
+          </p>
+        )}
+      </div>
+      {/* Slide count badge */}
+      <span className="absolute bottom-1 right-1.5 text-[8px] font-medium px-1 py-0.5 rounded bg-black/50 text-white">
+        Slide 1
+      </span>
+    </button>
   )
 }
 

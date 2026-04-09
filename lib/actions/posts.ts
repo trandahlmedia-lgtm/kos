@@ -281,20 +281,38 @@ export async function saveManualCaptionAction(
     .eq('post_id', idResult.data)
     .neq('id', captionId)
 
-  // Read current status to decide whether to auto-advance
+  // Read current status and check for a complete visual to decide auto-advance
   const { data: currentPost } = await supabase
     .from('posts')
     .select('status')
     .eq('id', idResult.data)
     .single()
 
+  // Check if the post has a visual that's ready (no missing photos)
+  const { data: visual } = await supabase
+    .from('post_visuals')
+    .select('export_status')
+    .eq('post_id', idResult.data)
+    .maybeSingle()
+
+  const hasCompleteVisual = visual && visual.export_status !== 'photos_needed'
+
+  let newStatus = currentPost?.status
+  if (newStatus === 'slot') {
+    // Advance slot → in_production when first caption is saved
+    newStatus = 'in_production'
+  }
+  if (newStatus === 'in_production' && hasCompleteVisual) {
+    // Caption + complete visual → ready
+    newStatus = 'ready'
+  }
+
   await supabase
     .from('posts')
     .update({
       caption: contentResult.data,
       selected_caption_id: captionId,
-      // Advance slot → in_production when first caption is saved
-      status: currentPost?.status === 'slot' ? 'in_production' : currentPost?.status,
+      status: newStatus,
       updated_at: new Date().toISOString(),
     })
     .eq('id', idResult.data)

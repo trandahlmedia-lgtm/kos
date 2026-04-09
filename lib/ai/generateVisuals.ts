@@ -172,7 +172,23 @@ export async function generateVisualForPost(
       throw new Error('Failed to save visual. Please try again.')
     }
 
-    // 14. Log AI run
+    // 14. Promote post status if it has a caption and visual is complete (no missing photos)
+    if (exportStatus === 'ready_to_export') {
+      const { data: currentPost } = await supabase
+        .from('posts')
+        .select('status, caption')
+        .eq('id', postId)
+        .single()
+
+      if (currentPost?.caption?.trim() && currentPost.status === 'in_production') {
+        await supabase
+          .from('posts')
+          .update({ status: 'ready', updated_at: new Date().toISOString() })
+          .eq('id', postId)
+      }
+    }
+
+    // 15. Log AI run
     await logAIRun({
       supabase,
       userId,

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { FlaskConical, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ResearchProgress } from './ResearchProgress'
 import { GenerateDraftsButton } from '@/components/outreach/GenerateDraftsButton'
@@ -64,18 +65,21 @@ export function LeadResearchTab({ leadId, leadName, leadEmail, aiScore, hasExist
     setError(null)
     setPollOnly(false)
     setRunning(true)
+    toast.info(`Researching ${leadName ?? 'lead'}...`)
   }
 
   const handleComplete = useCallback(() => {
     setRunning(false)
     setPollOnly(false)
+    toast.success(`Research complete for ${leadName ?? 'lead'}`)
     onResearchComplete()
-  }, [onResearchComplete])
+  }, [onResearchComplete, leadName])
 
   const handleError = useCallback((msg: string) => {
     setRunning(false)
     setPollOnly(false)
     setError(msg)
+    toast.error(`Research failed: ${msg}`)
   }, [])
 
   if (running) {

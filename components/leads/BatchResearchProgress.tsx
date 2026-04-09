@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Loader2, CheckCircle2, XCircle, Circle, ChevronDown, Ban } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Circle, ChevronDown, Ban, RotateCcw } from 'lucide-react'
 
 interface BatchItem {
   lead_id: string
@@ -30,9 +30,10 @@ const STEP_ORDER = ['website_audit', 'social_audit', 'business_intel', 'service_
 interface BatchResearchProgressProps {
   onAllComplete?: () => void
   onCancelBatch?: () => void
+  onResetStuck?: () => void
 }
 
-export function BatchResearchProgress({ onAllComplete, onCancelBatch }: BatchResearchProgressProps) {
+export function BatchResearchProgress({ onAllComplete, onCancelBatch, onResetStuck }: BatchResearchProgressProps) {
   const [items, setItems] = useState<BatchItem[]>([])
   const [open, setOpen] = useState(true)
   const [visible, setVisible] = useState(false)
@@ -217,6 +218,22 @@ export function BatchResearchProgress({ onAllComplete, onCancelBatch }: BatchRes
               </div>
             ))}
           </div>
+
+          {/* Reset All Stuck button */}
+          {onResetStuck && (
+            <div className="px-3 py-2 border-t border-[#2a2a2a]">
+              <button
+                onClick={() => {
+                  onResetStuck()
+                  setOpen(false)
+                }}
+                className="inline-flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
+              >
+                <RotateCcw size={10} />
+                Reset All Stuck
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

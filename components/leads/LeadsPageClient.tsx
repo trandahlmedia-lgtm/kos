@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Plus, Upload, FlaskConical, X } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   DndContext,
   DragOverlay,
@@ -167,13 +168,37 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ lead_ids: ids }),
         })
-        if (!res.ok) return // keep batch visible so user can retry
+        if (res.ok) {
+          toast.success('Research cancelled')
+          setBatchLeadIds(new Set())
+        } else {
+          toast.error('Failed to cancel — try Reset All Stuck')
+        }
       } catch {
-        return // keep batch visible so user can retry
+        toast.error('Failed to cancel — try Reset All Stuck')
       }
+    } else {
+      setBatchLeadIds(new Set())
     }
-    setBatchLeadIds(new Set())
   }, [batchLeadIds])
+
+  const resetStuckResearch = useCallback(async () => {
+    batchAbortRef.current?.abort()
+    try {
+      const res = await fetch('/api/ai/lead-research/reset-stuck', {
+        method: 'POST',
+      })
+      if (res.ok) {
+        const data = await res.json() as { count: number }
+        toast.success(`Research queue reset (${data.count} items)`)
+        setBatchLeadIds(new Set())
+      } else {
+        toast.error('Failed to reset research queue')
+      }
+    } catch {
+      toast.error('Failed to reset research queue')
+    }
+  }, [])
 
   const handleBatchComplete = useCallback(async () => {
     setBatchLeadIds(new Set())
@@ -341,6 +366,7 @@ export function LeadsPageClient({ initialLeads }: LeadsPageClientProps) {
         batchLeadIds={batchLeadIdsArray}
         onBatchComplete={handleBatchComplete}
         onCancelBatch={cancelBatchResearch}
+        onResetStuck={resetStuckResearch}
         showDisqualified={showDisqualified}
         onShowDisqualifiedChange={setShowDisqualified}
         disqualifiedCount={disqualifiedCount}

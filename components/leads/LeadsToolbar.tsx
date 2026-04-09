@@ -54,6 +54,7 @@ interface LeadsToolbarProps {
   batchLeadIds?: string[]
   onBatchComplete?: () => void
   onCancelBatch?: () => void
+  onResetStuck?: () => void
   showDisqualified?: boolean
   onShowDisqualifiedChange?: (show: boolean) => void
   disqualifiedCount?: number
@@ -80,6 +81,7 @@ export function LeadsToolbar({
   batchLeadIds,
   onBatchComplete,
   onCancelBatch,
+  onResetStuck,
   showDisqualified,
   onShowDisqualifiedChange,
   disqualifiedCount,
@@ -317,6 +319,7 @@ export function LeadsToolbar({
         <BatchResearchProgress
           onAllComplete={onBatchComplete}
           onCancelBatch={onCancelBatch}
+          onResetStuck={onResetStuck}
         />
 
         {/* Draft progress dropdown — shows when emails are being drafted */}

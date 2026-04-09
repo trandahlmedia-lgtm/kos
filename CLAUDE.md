@@ -20,6 +20,30 @@ If the task is a small bug fix in a single file, you can skip the full plan — 
 
 ---
 
+## Build & Quality
+
+After making code changes, always run the build (`npm run build` or equivalent) and fix any errors before presenting work as complete. Never skip the build verification step.
+
+---
+
+## Debugging
+
+Before fixing a bug, verify the root cause by tracing the full data flow (UI → state → API → database). Do not fix symptoms at the wrong layer. Check if the issue is data-layer (missing DB records) vs code-layer before writing fixes.
+
+---
+
+## Code Changes
+
+When making multi-file changes, do NOT introduce regressions in existing functionality. Before editing a file, read the current implementation fully to understand what behavior must be preserved.
+
+---
+
+## Content Writing
+
+For content writing tasks (social media captions, ad copy, scripts): be minimal and precise. Do not add details the user hasn't mentioned. When describing a video/reel, only reference what's actually shown in the footage, not the full service process.
+
+---
+
 ## CURRENT STATE — (overwrite this section, never append)
 
 <!-- Claude Code: At the end of each session, REPLACE everything between the markers below with a fresh 3-5 line snapshot. Do NOT grow this section. Delete the old content and write the new summary. Keep it under 6 lines. -->
@@ -157,6 +181,8 @@ Schema in Supabase. Tables: `profiles`, `clients`, `posts`, `captions`, `media`,
 | Validation | Zod v4 | Server actions + API routes |
 | Package manager | npm | |
 | Auth | `proxy.ts` (root) | Next.js 16 convention — not middleware.ts |
+
+**TypeScript + Supabase rules:** Always use TypeScript strict mode compatible patterns. After Supabase `.update()` or `.insert()`, verify the return signature before chaining `.select()`.
 
 ---
 

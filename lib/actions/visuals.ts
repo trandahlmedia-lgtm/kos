@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { generateVisualForPost } from '@/lib/ai/generateVisuals'
+import { generateVisualDirectForPost } from '@/lib/ai/generateVisuals'
 import type { PostVisual, DirectSlide } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ export async function generateVisualAction(
   const notesResult = z.string().max(1000).optional().safeParse(notes)
   if (!notesResult.success) throw new Error('Notes too long (max 1000 characters)')
 
-  const visual = await generateVisualForPost(
+  const visual = await generateVisualDirectForPost(
     supabase,
     idResult.data,
     user.id,

@@ -162,7 +162,6 @@ export function VisualPreviewModal({
   }, [isOpen, postId])
 
   const isDirectMode = visual?.generation_mode === 'direct'
-  console.log('[VisualPreviewModal] generation_mode:', visual?.generation_mode)
 
   // Build rendered HTML (inject editing script when in edit mode)
   const generatedHtml = visual?.generated_html ?? null

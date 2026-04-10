@@ -22,7 +22,6 @@ const PREVIEW_SCALE = PREVIEW_WIDTH / NATIVE_WIDTH
 const PREVIEW_HEIGHT = Math.round(NATIVE_HEIGHT * PREVIEW_SCALE)
 
 const STATUS_OPTIONS: { value: PostStatus; label: string }[] = [
-  { value: 'slot', label: 'Slot' },
   { value: 'in_production', label: 'In Production' },
   { value: 'ready', label: 'Ready' },
   { value: 'scheduled', label: 'Scheduled' },
@@ -432,7 +431,7 @@ export function SchedulePanel({
               >
                 <h3 className="text-white font-medium mb-2">Delete Visual?</h3>
                 <p className="text-sm text-[#999999] mb-4">
-                  This will remove the visual and reset the post to "In Production".
+                  This will remove the visual and reset the post to &quot;In Production&quot;.
                 </p>
                 <div className="flex gap-2 justify-end">
                   <button

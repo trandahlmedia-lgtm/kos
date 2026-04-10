@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createPostAction, updatePostAction } from '@/lib/actions/posts'
-import { type Post, type Platform, type ContentType, type Client } from '@/types'
+import { type Post, type Platform, type ContentType, type PostFormat, type Client } from '@/types'
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'instagram', label: 'Instagram' },
@@ -32,6 +32,13 @@ const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: 'education', label: 'Education' },
   { value: 'bts', label: 'Behind the Scenes' },
   { value: 'before_after', label: 'Before & After' },
+]
+
+const VISUAL_FORMATS: { value: PostFormat; label: string }[] = [
+  { value: 'carousel', label: 'Carousel' },
+  { value: 'static', label: 'Static Feed Post' },
+  { value: 'story_sequence', label: 'Story Sequence' },
+  { value: 'static_story', label: 'Static Story' },
 ]
 
 interface PostDialogProps {
@@ -63,6 +70,7 @@ export function PostDialog({
     client_id: post?.client_id ?? defaultClientId ?? '',
     platform: (post?.platform ?? '') as Platform | '',
     content_type: (post?.content_type ?? '') as ContentType | '',
+    format: (post?.format ?? 'carousel') as PostFormat,
     scheduled_date: post?.scheduled_date ?? defaultDate ?? '',
     scheduled_time: post?.scheduled_time ?? '',
     assigned_to: post?.assigned_to ?? '',
@@ -84,6 +92,7 @@ export function PostDialog({
         await updatePostAction(post.id, {
           platform: form.platform as Platform,
           content_type: (form.content_type as ContentType) || undefined,
+          format: form.format,
           cta: form.cta || undefined,
           phone: form.phone || undefined,
           hashtags: form.hashtags || undefined,
@@ -96,6 +105,7 @@ export function PostDialog({
           client_id: form.client_id,
           platform: form.platform as Platform,
           content_type: (form.content_type as ContentType) || undefined,
+          format: form.format,
           cta: form.cta || undefined,
           phone: form.phone || undefined,
           hashtags: form.hashtags || undefined,
@@ -171,6 +181,19 @@ export function PostDialog({
                 <option value="">Select type</option>
                 {CONTENT_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className={labelClass}>Visual Format</Label>
+              <select
+                value={form.format}
+                onChange={(e) => setForm((f) => ({ ...f, format: e.target.value as PostFormat }))}
+                className={selectClass}
+              >
+                {VISUAL_FORMATS.map((vf) => (
+                  <option key={vf.value} value={vf.value}>{vf.label}</option>
                 ))}
               </select>
             </div>

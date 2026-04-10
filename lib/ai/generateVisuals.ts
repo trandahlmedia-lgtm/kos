@@ -137,7 +137,7 @@ export async function generateVisualForPost(
 
   // 5. Build the angle from post data
   const postAngle = post.angle ?? post.ai_reasoning ?? 'General brand awareness post'
-  const format = (post.format ?? 'carousel') as 'carousel' | 'static' | 'story_sequence'
+  const format = (post.format ?? 'carousel') as 'carousel' | 'static' | 'story_sequence' | 'static_story'
   const placement = (post.placement ?? 'feed') as 'feed' | 'story'
   const contentType = (post.content_type ?? 'trust') as string
 
@@ -198,7 +198,7 @@ export async function generateVisualForPost(
     // 9. Render HTML — carousel, static, or story_sequence based on format
     const renderParams = { brief, palette, fontPair, clientName, instagramHandle, logoUrls, websiteUrl }
     const generatedHtml =
-      format === 'static'
+      format === 'static' || format === 'static_story'
         ? renderStatic(renderParams)
         : format === 'story_sequence'
         ? renderStorySequence(renderParams)

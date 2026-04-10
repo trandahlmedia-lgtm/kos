@@ -5,7 +5,7 @@ export interface VisualPlanInput {
   claudeMd: string
   postAngle: string
   contentType: string
-  format: 'carousel' | 'static' | 'story_sequence'
+  format: 'carousel' | 'static' | 'story_sequence' | 'static_story'
   placement: 'feed' | 'story'
   userNotes?: string
   recentRecipes: string[][]
@@ -283,18 +283,21 @@ CreativeBrief JSON structure:
   "cta_text": "The primary CTA text"
 }`
 
-export function getVisualPlanSystem(format: 'carousel' | 'static' | 'story_sequence'): string {
-  if (format === 'static') return VISUAL_PLAN_STATIC_SYSTEM
+export function getVisualPlanSystem(format: 'carousel' | 'static' | 'story_sequence' | 'static_story'): string {
+  if (format === 'static' || format === 'static_story') return VISUAL_PLAN_STATIC_SYSTEM
   if (format === 'story_sequence') return VISUAL_PLAN_STORY_SEQUENCE_SYSTEM
   return VISUAL_PLAN_SYSTEM
 }
 
 export function buildVisualPlanUser(input: VisualPlanInput): string {
-  const slideCount = input.slideCount ?? (input.format === 'static' ? 1 : 7)
+  const isStaticFormat = input.format === 'static' || input.format === 'static_story'
+  const slideCount = input.slideCount ?? (isStaticFormat ? 1 : 7)
   const contentTypeLabel = (input.contentType as ContentType).replace(/_/g, ' ')
   const formatLabel =
     input.format === 'story_sequence'
       ? 'story sequence (9:16 vertical, 420×747px per slide)'
+      : input.format === 'static_story'
+      ? 'static story (9:16 vertical, single frame)'
       : input.format
 
   const recentSection = input.recentRecipes.length > 0

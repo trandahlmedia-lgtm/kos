@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { type Platform, type ContentType, type PostStatus } from '@/types'
+import { type Platform, type ContentType, type PostStatus, type PostFormat } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Input validation schemas
@@ -17,11 +17,13 @@ const contentTypeEnum = z.enum([
 const postStatusEnum = z.enum([
   'slot', 'in_production', 'ready', 'scheduled', 'published',
 ])
+const postFormatEnum = z.enum(['carousel', 'static', 'story_sequence', 'static_story'])
 
 const createPostSchema = z.object({
   client_id: z.string().uuid('Invalid client ID'),
   platform: platformEnum,
   content_type: contentTypeEnum.optional(),
+  format: postFormatEnum.default('carousel'),
   status: postStatusEnum.default('slot'),
   caption: z.string().max(5000).optional(),
   cta: z.string().max(200).trim().optional().or(z.literal('').transform(() => undefined)),
@@ -51,6 +53,7 @@ export async function createPostAction(input: {
   client_id: string
   platform: Platform
   content_type?: ContentType
+  format?: PostFormat
   caption?: string
   cta?: string
   phone?: string
@@ -74,6 +77,7 @@ export async function createPostAction(input: {
       client_id: clean.client_id,
       platform: clean.platform,
       content_type: clean.content_type ?? null,
+      format: clean.format,
       status: clean.status,
       caption: clean.caption ?? null,
       cta: clean.cta ?? null,
@@ -105,6 +109,7 @@ export async function updatePostAction(
   input: Partial<{
     platform: Platform
     content_type: ContentType
+    format: PostFormat
     caption: string
     cta: string
     phone: string
@@ -129,6 +134,7 @@ export async function updatePostAction(
 
   if (clean.platform !== undefined) updatePayload.platform = clean.platform
   if (clean.content_type !== undefined) updatePayload.content_type = clean.content_type ?? null
+  if (clean.format !== undefined) updatePayload.format = clean.format
   if (clean.caption !== undefined) updatePayload.caption = clean.caption ?? null
   if (clean.cta !== undefined) updatePayload.cta = clean.cta ?? null
   if (clean.phone !== undefined) updatePayload.phone = clean.phone ?? null

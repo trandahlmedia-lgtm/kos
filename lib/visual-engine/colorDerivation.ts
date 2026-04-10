@@ -77,7 +77,6 @@ export function darken(hex: string, amount: number): string {
 // --- Warm vs cool hue detection ---
 
 function isWarmHue(hue: number): boolean {
-  // Warm: 0-60 (red → yellow) and 300-360 (magenta → red)
   return hue <= 60 || hue >= 300
 }
 
@@ -87,19 +86,25 @@ export function deriveColorPalette(primaryHex: string, accentHex?: string): Colo
   const { h, s, l } = hexToHsl(primaryHex)
   const warm = isWarmHue(h)
 
-  const light_bg = warm ? '#FAF8F5' : '#F5F7FA'
-  const dark_bg = darken(primaryHex, 30)
+  const light_bg = warm ? '#FAF7F4' : '#F2F4F7'
+
+  // Darken by 8 lightness points — produces #0F2640 from #1B3A5C
+  const dark_bg = darken(primaryHex, 8)
 
   // If no accent provided, derive a complementary/warm accent automatically
   const brand_accent = accentHex ?? hslToHex((h + 180) % 360, Math.min(s + 0.15, 1), Math.max(l, 0.45))
 
+  // Lighter accent for tags on dark slides (e.g. #F0A06A from #E8732A)
+  const accent_light = lighten(brand_accent, 15)
+
   return {
     brand_primary: primaryHex,
     brand_accent,
+    accent_light,
     brand_light: lighten(primaryHex, 20),
     brand_dark: darken(primaryHex, 30),
     light_bg,
-    light_border: darken(light_bg, 5),
+    light_border: darken(light_bg, 6),
     dark_bg,
   }
 }
@@ -107,5 +112,5 @@ export function deriveColorPalette(primaryHex: string, accentHex?: string): Colo
 // --- Gradient builder ---
 
 export function buildBrandGradient(palette: ColorPalette): string {
-  return `linear-gradient(165deg, ${palette.brand_dark} 0%, ${palette.brand_primary} 50%, ${palette.brand_light} 100%)`
+  return `linear-gradient(165deg, ${palette.dark_bg} 0%, ${palette.brand_primary} 40%, ${palette.brand_accent} 100%)`
 }

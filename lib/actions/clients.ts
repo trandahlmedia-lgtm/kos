@@ -336,9 +336,12 @@ export async function getSignedLogoUrls(
   for (const key of keys) {
     const path = logos[key]
     if (path) {
-      const { data: signedData } = await adminClient.storage
+      const { data: signedData, error: signError } = await adminClient.storage
         .from('kos-media')
         .createSignedUrl(path, 3600)
+      if (signError) {
+        console.error(`[getSignedLogoUrls] Failed to sign ${key} (${path}):`, signError.message)
+      }
       if (signedData?.signedUrl) {
         result[key] = signedData.signedUrl
       }

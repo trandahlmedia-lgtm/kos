@@ -38,7 +38,7 @@ const csp = [
   // Restrict fetch/XHR/WebSocket to own origin and Supabase.
   `connect-src 'self' ${supabaseHost} ${supabaseWss}`,
   // Allow data: URIs for generated thumbnails; blob: for file previews.
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${supabaseHost}`,
   // Allow blob: iframes for the visual preview modal (carousel HTML rendered via blob URL).
   "frame-src 'self' blob:",
   // Block all plugin/object embeds (Flash, Java applets, etc.).

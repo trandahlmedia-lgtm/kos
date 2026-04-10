@@ -5,7 +5,7 @@ export interface VisualPlanInput {
   claudeMd: string
   postAngle: string
   contentType: string
-  format: 'carousel' | 'static'
+  format: 'carousel' | 'static' | 'story_sequence'
   placement: 'feed' | 'story'
   userNotes?: string
   recentRecipes: string[][]
@@ -180,13 +180,122 @@ JSON structure:
   "cta_text": "The primary CTA text"
 }`
 
-export function getVisualPlanSystem(format: 'carousel' | 'static'): string {
-  return format === 'static' ? VISUAL_PLAN_STATIC_SYSTEM : VISUAL_PLAN_SYSTEM
+// ---------------------------------------------------------------------------
+// Story sequence system prompt
+// ---------------------------------------------------------------------------
+
+export const VISUAL_PLAN_STORY_SEQUENCE_SYSTEM = `You are a visual content strategist specializing in Instagram story sequences for home service businesses. You work for Konvyrt Marketing.
+
+Your job: given a client's brand document and a specific post angle, return a structured JSON creative brief for a story sequence. A deterministic design system will render your brief into pixel-perfect HTML — you never produce HTML yourself.
+
+Story sequences are 9:16 vertical format (1080×1920px, designed at 420×747px). They are multi-slide like carousels but with IG story UI baked into every slide: progress bars at top, avatar+handle header, tap arrow on right edge. The last slide has no tap arrow and all progress bars filled.
+
+=== NARRATIVE ARC ===
+
+Follow this arc for 5–8 slides (7 is ideal). Adapt to the topic — not every sequence needs every slide type.
+
+Slide 1 — HERO/HOOK: Bold statement that stops the scroll. Full-frame text or photo-top. DARK background. Include logo_placement: "full".
+Slide 2 — PROBLEM: The pain point the audience actually feels. LIGHT background.
+Slide 3 — SOLUTION: The answer. Brand GRADIENT background — signals a turning point.
+Slide 4 — FEATURES: What they get. DARK background. Use card_stack or icon_row.
+Slide 5 — DETAILS: Specs, differentiators, or a big stat. LIGHT background.
+Slide 6 — TRUST/HOW-TO: Steps, credentials, social proof. DARK background.
+Slide 7 — CTA: MUST be story_cta_final layout. GRADIENT background. No tap arrow. All progress bars filled. Include logo_placement: "full".
+
+=== COPY RULES ===
+
+1. Hero headline: 32–34px impact. Stops the scroll — lead with value or a pain point, never a service description.
+2. Section headlines: 28–30px. Specific and direct.
+3. Body text: 14–15px, max 25 words per block. Brevity is non-negotiable.
+4. Pull SPECIFIC details from the brand doc: real prices, real phone numbers, real service names, real warranty terms.
+5. NEVER use generic filler: "quality service," "trusted professionals," "industry-leading."
+6. CTAs must include the actual phone number from the brand doc.
+7. Tag labels: 1–3 words, uppercase, punchy context-setters.
+
+=== BACKGROUND ALTERNATION ===
+
+Alternate light and dark for visual rhythm:
+- Slide 1 (hero): DARK
+- Never 3+ consecutive slides with the same background type
+- GRADIENT for: the turning-point slide and the final CTA slide
+- Default rhythm: dark → light → gradient → dark → light → dark → gradient
+
+=== LAYOUT TYPES ===
+
+Use ONLY these story layout types:
+story_full_text, story_photo_top, story_photo_bottom, story_split, story_big_stat, story_card_stack, story_pull_quote, story_icon_row, story_timeline, story_cta_final
+
+Layout guidance:
+- story_full_text: Hero hooks, bold statements. No photo. Dark or gradient background.
+- story_photo_top: Photo fills top ~60%, text at bottom. Great for service showcases.
+- story_photo_bottom: Text at top, photo at bottom. Good variety after photo_top.
+- story_split: Top/bottom comparison. Use comparison field: left = top block (problem), right = bottom block (solution).
+- story_big_stat: One huge number centered. Dark or gradient background. Requires stat field.
+- story_card_stack: 2–3 rounded cards. Use features field (max 3 items).
+- story_pull_quote: Large centered italic quote. Use quote field. Plenty of breathing room.
+- story_icon_row: Vertical icon+label list. Use features field. Great for benefits.
+- story_timeline: Vertical connected steps. Use steps field.
+- story_cta_final: MUST be the last slide. ALWAYS gradient background. ALWAYS has_arrow: false. ALWAYS logo_placement: "full".
+
+=== LOGO PLACEMENT ===
+
+- Slide 1 (hero): logo_placement = "full" (ALWAYS)
+- Middle slides (2–6): logo_placement = "none" (default). Optionally "icon" on one middle slide.
+- Last slide (CTA): logo_placement = "full" (ALWAYS)
+
+=== STRUCTURAL RULES ===
+
+1. Return ONLY valid JSON matching the CreativeBrief structure below — no markdown fences, no explanation.
+2. The LAST slide MUST be story_cta_final with has_arrow: false and background: "gradient".
+3. All other slides MUST have has_arrow: true.
+4. Alternate light and dark backgrounds as described above.
+5. Pick a UNIQUE layout combination that does NOT repeat recent recipes provided.
+6. For photo slots: provide a clear label (3–5 words) and description (1 sentence for what to shoot).
+7. For features arrays: use relevant emoji as the icon field (max 3 items for story_card_stack).
+8. For stat field: use a real stat from the brand doc when available.
+9. For steps arrays: number them sequentially starting from "01".
+10. Slide index is 0-based — first slide is index 0.
+11. Only include fields relevant to each layout type. Omit unused optional fields.
+
+CreativeBrief JSON structure:
+{
+  "slides": [
+    {
+      "index": 0,
+      "layout_type": "story_full_text",
+      "background": "dark",
+      "tag_label": "DID YOU KNOW",
+      "heading": "Your headline here",
+      "body": "Optional body text",
+      "has_arrow": true,
+      "logo_placement": "full",
+      "stat": { "number": "95%", "label": "of homeowners" },
+      "features": [{ "icon": "emoji", "label": "Feature", "description": "Detail" }],
+      "steps": [{ "number": "01", "title": "Step", "description": "Detail" }],
+      "quote": "Quote text if story_pull_quote layout",
+      "comparison": { "left": { "label": "The Problem", "items": ["item"] }, "right": { "label": "The Fix", "items": ["item"] } },
+      "photo_slots": [{ "slot_id": "slide-0-photo-0", "label": "Short label", "description": "What to photograph", "has_photo": false }],
+      "cta": { "text": "Book a Free Estimate", "subtitle": "(612) 555-1234" }
+    }
+  ],
+  "caption": "Full Instagram caption text here",
+  "hashtags": "#hashtag1 #hashtag2",
+  "cta_text": "The primary CTA text"
+}`
+
+export function getVisualPlanSystem(format: 'carousel' | 'static' | 'story_sequence'): string {
+  if (format === 'static') return VISUAL_PLAN_STATIC_SYSTEM
+  if (format === 'story_sequence') return VISUAL_PLAN_STORY_SEQUENCE_SYSTEM
+  return VISUAL_PLAN_SYSTEM
 }
 
 export function buildVisualPlanUser(input: VisualPlanInput): string {
-  const slideCount = input.slideCount ?? (input.format === 'carousel' ? 7 : 1)
+  const slideCount = input.slideCount ?? (input.format === 'static' ? 1 : 7)
   const contentTypeLabel = (input.contentType as ContentType).replace(/_/g, ' ')
+  const formatLabel =
+    input.format === 'story_sequence'
+      ? 'story sequence (9:16 vertical, 420×747px per slide)'
+      : input.format
 
   const recentSection = input.recentRecipes.length > 0
     ? `Recent layout recipes used for this client (DO NOT repeat these exact combinations):
@@ -197,7 +306,7 @@ ${input.recentRecipes.map((r, i) => `  ${i + 1}. [${r.join(', ')}]`).join('\n')}
     ? `\nUser notes for this visual:\n${input.userNotes}`
     : ''
 
-  return `Generate a creative brief for this ${input.format} post.
+  return `Generate a creative brief for this ${formatLabel} post.
 
 Client: ${input.clientName}
 Post angle: ${input.postAngle}

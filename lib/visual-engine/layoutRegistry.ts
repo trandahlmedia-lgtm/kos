@@ -676,6 +676,278 @@ const staticFullBleed: SlideRenderFn = ({ slide, palette, logoUrls }) => {
 }
 
 // ---------------------------------------------------------------------------
+// Story layout content functions
+// These return ONLY inner slide HTML — no .story-slide wrapper, no chrome.
+// renderStorySequence() in slideRenderer.ts applies the progress bars,
+// header, and tap arrow overlay around each layout's output.
+//
+// Content top padding: 76px (clears progress bars at top:12px + header at top:24px, 36px tall)
+// Content side padding: 28px standard (per spec)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// S1. story_full_text — centered text, no photo, typographic impact
+// ---------------------------------------------------------------------------
+
+const storyFullText: SlideRenderFn = ({ slide, palette }) => {
+  const heading = textColor(slide.background, palette)
+  const body = secondaryText(slide.background)
+  const tag = slide.background === 'gradient'
+    ? renderGradientTag(slide.tag_label)
+    : renderTag(slide.tag_label, slide.background, palette)
+
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:76px 28px 40px;text-align:center;">
+    ${tag}
+    <h1 class="serif" style="font-size:32px;font-weight:800;color:${heading};line-height:1.1;letter-spacing:-0.5px;margin-bottom:20px;">${esc(slide.heading)}</h1>
+    ${slide.body ? `<p class="sans" style="font-size:15px;color:${body};line-height:1.5;max-width:340px;">${formatText(slide.body)}</p>` : ''}
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S2. story_photo_top — photo top ~60%, gradient bridge, text bottom
+// ---------------------------------------------------------------------------
+
+const storyPhotoTop: SlideRenderFn = ({ slide, palette }) => {
+  const heading = textColor(slide.background, palette)
+  const body = secondaryText(slide.background)
+  const deepBg = isLightSlide(slide.background) ? palette.light_bg : palette.dark_bg
+  const slot = slide.photo_slots?.[0] ?? { slot_id: `story-photo-${slide.index}`, label: 'Photo' }
+  const tag = slide.background === 'gradient'
+    ? renderGradientTag(slide.tag_label)
+    : renderTag(slide.tag_label, slide.background, palette)
+
+  return `<div style="height:100%;display:flex;flex-direction:column;">
+    <div style="position:relative;height:448px;flex-shrink:0;overflow:hidden;">
+      ${renderPhotoSlot(slot, '100%', '100%', slide.background)}
+      <div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,transparent,${deepBg});pointer-events:none;z-index:1;"></div>
+    </div>
+    <div style="flex:1;background:${deepBg};padding:16px 28px 32px;display:flex;flex-direction:column;justify-content:flex-end;">
+      ${tag}
+      <h2 class="serif" style="font-size:28px;font-weight:800;color:${heading};line-height:1.12;letter-spacing:-0.3px;margin-bottom:12px;">${esc(slide.heading)}</h2>
+      ${slide.body ? `<p class="sans" style="font-size:14px;color:${body};line-height:1.5;">${formatText(slide.body)}</p>` : ''}
+    </div>
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S3. story_photo_bottom — text top, photo bottom
+// ---------------------------------------------------------------------------
+
+const storyPhotoBottom: SlideRenderFn = ({ slide, palette }) => {
+  const heading = textColor(slide.background, palette)
+  const body = secondaryText(slide.background)
+  const deepBg = isLightSlide(slide.background) ? palette.light_bg : palette.dark_bg
+  const slot = slide.photo_slots?.[0] ?? { slot_id: `story-photo-${slide.index}`, label: 'Photo' }
+  const tag = slide.background === 'gradient'
+    ? renderGradientTag(slide.tag_label)
+    : renderTag(slide.tag_label, slide.background, palette)
+
+  return `<div style="height:100%;display:flex;flex-direction:column;">
+    <div style="background:${deepBg};padding:76px 28px 24px;display:flex;flex-direction:column;justify-content:flex-start;flex:1;">
+      ${tag}
+      <h2 class="serif" style="font-size:28px;font-weight:800;color:${heading};line-height:1.12;letter-spacing:-0.3px;margin-bottom:12px;">${esc(slide.heading)}</h2>
+      ${slide.body ? `<p class="sans" style="font-size:14px;color:${body};line-height:1.5;">${formatText(slide.body)}</p>` : ''}
+    </div>
+    <div style="position:relative;height:320px;flex-shrink:0;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:40px;background:linear-gradient(to top,transparent,${deepBg});pointer-events:none;z-index:1;"></div>
+      ${renderPhotoSlot(slot, '100%', '100%', slide.background)}
+    </div>
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S4. story_split — top/bottom split for comparisons (comparison.left = top, .right = bottom)
+// ---------------------------------------------------------------------------
+
+const storySplit: SlideRenderFn = ({ slide, palette }) => {
+  const top = slide.comparison?.left ?? { label: 'Before', items: [] }
+  const bottom = slide.comparison?.right ?? { label: 'After', items: [] }
+  const deepBg = palette.dark_bg
+  const accentBg = palette.brand_accent
+
+  const topItems = top.items.map((item) =>
+    `<div class="sans" style="font-size:14px;color:rgba(255,255,255,0.65);padding:4px 0;line-height:1.4;">${esc(item)}</div>`
+  ).join('')
+
+  const bottomItems = bottom.items.map((item) =>
+    `<div class="sans" style="font-size:14px;color:rgba(255,255,255,0.9);padding:4px 0;line-height:1.4;font-weight:500;">${esc(item)}</div>`
+  ).join('')
+
+  return `<div style="height:100%;display:flex;flex-direction:column;">
+    <div style="flex:1;background:${deepBg};padding:76px 28px 28px;display:flex;flex-direction:column;justify-content:flex-end;">
+      <div class="sans" style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:10px;">${esc(top.label)}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;">${topItems}</div>
+    </div>
+    <div style="flex:1;background:${accentBg};padding:28px;display:flex;flex-direction:column;justify-content:flex-start;">
+      <div class="sans" style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:10px;">${esc(bottom.label)}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;">${bottomItems}</div>
+    </div>
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S5. story_big_stat — huge centered number/stat with supporting text
+// ---------------------------------------------------------------------------
+
+const storyBigStat: SlideRenderFn = ({ slide, palette }) => {
+  const heading = textColor(slide.background, palette)
+  const body = secondaryText(slide.background)
+  const statNum = slide.stat?.number ?? ''
+  const statLabel = slide.stat?.label ?? ''
+  const tag = slide.background === 'gradient'
+    ? renderGradientTag(slide.tag_label)
+    : renderTag(slide.tag_label, slide.background, palette)
+
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:76px 28px 40px;text-align:center;">
+    ${tag}
+    <div class="serif" style="font-size:52px;font-weight:800;color:${palette.brand_accent};line-height:1.0;letter-spacing:-2px;margin-bottom:8px;">${esc(statNum)}</div>
+    ${statLabel ? `<div class="sans" style="font-size:15px;color:${body};margin-bottom:24px;line-height:1.4;">${esc(statLabel)}</div>` : ''}
+    <h2 class="serif" style="font-size:28px;font-weight:800;color:${heading};line-height:1.12;letter-spacing:-0.3px;">${esc(slide.heading)}</h2>
+    ${slide.body ? `<p class="sans" style="font-size:14px;color:${body};margin-top:16px;line-height:1.5;">${formatText(slide.body)}</p>` : ''}
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S6. story_card_stack — 2-3 stacked cards with content
+// ---------------------------------------------------------------------------
+
+const storyCardStack: SlideRenderFn = ({ slide, palette }) => {
+  const light = isLightSlide(slide.background)
+  const heading = textColor(slide.background, palette)
+  const features = (slide.features ?? []).slice(0, 3)
+  const cardBg = light ? '#FFFFFF' : 'rgba(255,255,255,0.06)'
+  const cardBorder = light ? palette.light_border : 'rgba(255,255,255,0.08)'
+  const labelColor = light ? palette.dark_bg : '#FFFFFF'
+  const descColor = light ? '#888888' : 'rgba(255,255,255,0.5)'
+  const tag = slide.background === 'gradient'
+    ? renderGradientTag(slide.tag_label)
+    : renderTag(slide.tag_label, slide.background, palette)
+
+  const cards = features.map((f) =>
+    `<div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:14px;">
+      <span style="font-size:22px;line-height:1;flex-shrink:0;">${esc(f.icon)}</span>
+      <div>
+        <div class="serif" style="font-size:15px;font-weight:700;color:${labelColor};line-height:1.3;margin-bottom:4px;">${esc(f.label)}</div>
+        <div class="sans" style="font-size:12px;color:${descColor};line-height:1.4;">${esc(f.description)}</div>
+      </div>
+    </div>`
+  ).join('')
+
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;padding:76px 28px 40px;">
+    ${tag}
+    <h2 class="serif" style="font-size:28px;font-weight:800;color:${heading};line-height:1.12;letter-spacing:-0.3px;margin-bottom:20px;">${esc(slide.heading)}</h2>
+    <div style="display:flex;flex-direction:column;gap:12px;">${cards}</div>
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S7. story_pull_quote — large centered italic quote
+// ---------------------------------------------------------------------------
+
+const storyPullQuote: SlideRenderFn = ({ slide, palette }) => {
+  const quoteText = slide.quote ?? slide.heading
+  const body = secondaryText(slide.background)
+  const isGrad = slide.background === 'gradient'
+  const quoteColor = isGrad ? '#FFFFFF' : textColor(slide.background, palette)
+
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:76px 40px 40px;text-align:center;">
+    <div style="width:40px;height:3px;background:${palette.brand_accent};border-radius:2px;margin-bottom:28px;"></div>
+    <p class="serif" style="font-size:22px;font-style:italic;color:${quoteColor};line-height:1.45;font-weight:600;letter-spacing:-0.2px;">&ldquo;${esc(quoteText)}&rdquo;</p>
+    <div style="width:40px;height:3px;background:${palette.brand_accent};border-radius:2px;margin-top:28px;"></div>
+    ${slide.body ? `<p class="sans" style="font-size:13px;color:${body};margin-top:24px;line-height:1.5;font-style:italic;">${formatText(slide.body)}</p>` : ''}
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S8. story_icon_row — vertical icon+label list
+// ---------------------------------------------------------------------------
+
+const storyIconRow: SlideRenderFn = ({ slide, palette }) => {
+  const light = isLightSlide(slide.background)
+  const heading = textColor(slide.background, palette)
+  const features = slide.features ?? []
+  const borderColor = light ? palette.light_border : 'rgba(255,255,255,0.08)'
+  const labelColor = light ? palette.dark_bg : '#FFFFFF'
+  const descColor = light ? '#888888' : 'rgba(255,255,255,0.5)'
+  const tag = slide.background === 'gradient'
+    ? renderGradientTag(slide.tag_label)
+    : renderTag(slide.tag_label, slide.background, palette)
+
+  const items = features.map((f, i) => {
+    const isLast = i === features.length - 1
+    return `<div style="display:flex;align-items:flex-start;gap:14px;padding:12px 0;${isLast ? '' : `border-bottom:1px solid ${borderColor};`}">
+      <span style="color:${palette.brand_accent};font-size:20px;width:24px;text-align:center;flex-shrink:0;line-height:1.3;">${esc(f.icon)}</span>
+      <div>
+        <span class="sans" style="font-size:14px;font-weight:600;color:${labelColor};display:block;">${esc(f.label)}</span>
+        <span class="sans" style="font-size:12px;color:${descColor};display:block;margin-top:2px;line-height:1.4;">${esc(f.description)}</span>
+      </div>
+    </div>`
+  }).join('')
+
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;padding:76px 28px 40px;">
+    ${tag}
+    <h2 class="serif" style="font-size:28px;font-weight:800;color:${heading};line-height:1.12;letter-spacing:-0.3px;margin-bottom:20px;">${esc(slide.heading)}</h2>
+    <div>${items}</div>
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S9. story_timeline — vertical connected steps
+// ---------------------------------------------------------------------------
+
+const storyTimeline: SlideRenderFn = ({ slide, palette }) => {
+  const light = isLightSlide(slide.background)
+  const heading = textColor(slide.background, palette)
+  const steps = slide.steps ?? []
+  const dotBorderColor = light ? palette.light_bg : palette.dark_bg
+  const lineColor = light ? palette.light_border : 'rgba(255,255,255,0.1)'
+  const stepTitleColor = light ? palette.dark_bg : '#FFFFFF'
+  const stepDescColor = light ? '#888888' : 'rgba(255,255,255,0.5)'
+  const tag = slide.background === 'gradient'
+    ? renderGradientTag(slide.tag_label)
+    : renderTag(slide.tag_label, slide.background, palette)
+
+  const stepsHtml = steps.map((step, i) => {
+    const isLast = i === steps.length - 1
+    return `<div style="position:relative;${isLast ? '' : 'margin-bottom:20px;'}">
+      <div style="position:absolute;left:-24px;top:4px;width:14px;height:14px;border-radius:50%;background:${palette.brand_accent};border:3px solid ${dotBorderColor};"></div>
+      <div class="serif" style="font-size:14px;font-weight:700;color:${stepTitleColor};margin-bottom:3px;">${esc(step.title)}</div>
+      <div class="sans" style="font-size:12px;color:${stepDescColor};line-height:1.4;">${esc(step.description)}</div>
+    </div>`
+  }).join('')
+
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;padding:76px 36px 40px;">
+    ${tag}
+    <h2 class="serif" style="font-size:28px;font-weight:800;color:${heading};line-height:1.12;letter-spacing:-0.3px;margin-bottom:24px;">${esc(slide.heading)}</h2>
+    <div style="position:relative;padding-left:28px;">
+      <div style="position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:${lineColor};"></div>
+      ${stepsHtml}
+    </div>
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
+// S10. story_cta_final — CTA final slide (gradient bg, no tap arrow, all bars filled)
+// ---------------------------------------------------------------------------
+
+const storyCTAFinal: SlideRenderFn = ({ slide, palette, logoUrls }) => {
+  const ctaText = slide.cta?.text ?? 'Book a Free Estimate'
+  const ctaSub = slide.cta?.subtitle ?? ''
+
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:76px 36px 40px;text-align:center;">
+    ${renderLogo(slide.logo_placement === 'full' ? 'full' : undefined, 'gradient', logoUrls, 72, 220)}
+    ${slide.tag_label ? `<span class="sans" style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:12px;">${esc(slide.tag_label)}</span>` : ''}
+    <h2 class="serif" style="font-size:30px;font-weight:800;color:#FFFFFF;line-height:1.12;letter-spacing:-0.3px;margin-bottom:16px;">${esc(slide.heading)}</h2>
+    ${slide.body ? `<p class="sans" style="font-size:14px;color:rgba(255,255,255,0.7);line-height:1.5;margin-bottom:28px;">${formatText(slide.body)}</p>` : '<div style="margin-bottom:28px;"></div>'}
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:${palette.brand_accent};border-radius:28px;">
+      <span class="sans" style="font-weight:700;font-size:13px;color:white;letter-spacing:0.5px;text-transform:uppercase;">${esc(ctaText)}</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </div>
+    ${ctaSub ? `<p class="sans" style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:16px;">${esc(ctaSub)}</p>` : ''}
+  </div>`
+}
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -696,4 +968,15 @@ export const LAYOUT_REGISTRY: Record<string, SlideRenderFn> = {
   cta_final: ctaFinal,
   static_photo_top: staticPhotoTop,
   static_full_bleed: staticFullBleed,
+  // Story sequence layouts
+  story_full_text: storyFullText,
+  story_photo_top: storyPhotoTop,
+  story_photo_bottom: storyPhotoBottom,
+  story_split: storySplit,
+  story_big_stat: storyBigStat,
+  story_card_stack: storyCardStack,
+  story_pull_quote: storyPullQuote,
+  story_icon_row: storyIconRow,
+  story_timeline: storyTimeline,
+  story_cta_final: storyCTAFinal,
 }

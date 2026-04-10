@@ -1,7 +1,72 @@
 import { LAYOUT_REGISTRY } from './layoutRegistry'
 import { buildFontUrl } from './fontLoader'
+import { buildBrandGradient } from './colorDerivation'
 import { renderHeader, renderDots, renderActions, renderCaption } from './frameWrapper'
 import type { CreativeBrief, ColorPalette, FontPair, BrandLogos } from '@/types'
+
+// ---------------------------------------------------------------------------
+// Story chrome helpers — used only by renderStorySequence
+// ---------------------------------------------------------------------------
+
+function escStory(str: string): string {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function storySlideBackground(bg: 'light' | 'dark' | 'gradient', palette: ColorPalette): string {
+  if (bg === 'gradient') return buildBrandGradient(palette)
+  return bg === 'light' ? palette.light_bg : palette.dark_bg
+}
+
+function storyProgressBars(slideIndex: number, totalSlides: number): string {
+  const safeTotal = Math.max(1, totalSlides)
+  const safeIndex = Math.max(0, Math.min(slideIndex, safeTotal - 1))
+  const segments = Array.from({ length: safeTotal }, (_, i) => {
+    const filled = i <= safeIndex
+    const bg = filled ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.3)'
+    return `<div style="flex:1;height:2px;border-radius:2px;background:${bg};"></div>`
+  }).join('')
+  return `<div style="position:absolute;top:12px;left:12px;right:12px;display:flex;gap:4px;z-index:20;">${segments}</div>`
+}
+
+function storyHeader(
+  handle: string,
+  palette: ColorPalette,
+  isDark: boolean,
+  logoUrls?: BrandLogos,
+  fontPair?: FontPair
+): string {
+  const avatarBg = isDark ? palette.brand_accent : palette.brand_primary
+  const handleColor = isDark ? '#FFFFFF' : palette.dark_bg
+  const timeColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.35)'
+  const borderColor = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'
+  const headingFont = escStory(fontPair?.heading ?? 'Montserrat')
+  const cleanHandle = handle.replace(/^@/, '')
+  const initial = cleanHandle.slice(0, 1).toUpperCase()
+
+  const avatarInner = logoUrls?.icon
+    ? `<img src="${escStory(logoUrls.icon)}" style="width:24px;height:24px;object-fit:contain;filter:drop-shadow(0 0 4px rgba(255,255,255,0.5));" alt="">`
+    : `<div style="font-size:14px;font-weight:700;color:#FFFFFF;">${escStory(initial)}</div>`
+
+  return `<div style="position:absolute;top:24px;left:16px;right:16px;display:flex;align-items:center;gap:10px;z-index:15;">
+    <div style="width:36px;height:36px;border-radius:50%;background:${avatarBg};border:2px solid ${borderColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${avatarInner}</div>
+    <div>
+      <span style="font-family:'${headingFont}',sans-serif;font-size:13px;font-weight:600;color:${handleColor};">@${escStory(cleanHandle)}</span>
+      <span style="font-size:11px;color:${timeColor};"> · 2h</span>
+    </div>
+  </div>`
+}
+
+function storyTapArrow(isDark: boolean): string {
+  const gradBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+  const strokeColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)'
+  return `<div style="position:absolute;right:0;top:0;bottom:0;width:48px;z-index:9;display:flex;align-items:center;justify-content:center;background:linear-gradient(to right,transparent,${gradBg});"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="${strokeColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
+}
 
 // ---------------------------------------------------------------------------
 // renderCarousel — produces a complete, self-contained HTML document
@@ -89,6 +154,98 @@ viewport.addEventListener('pointerdown',e=>{dragging=true;startX=e.clientX;dx=0;
 viewport.addEventListener('pointermove',e=>{if(!dragging)return;dx=e.clientX-startX;track.style.transform='translateX('+(-current*W+dx)+'px)';});
 viewport.addEventListener('pointerup',()=>{dragging=false;track.style.transition='transform 0.35s cubic-bezier(.4,0,.2,1)';if(dx<-40)goTo(current+1);else if(dx>40)goTo(current-1);else goTo(current);});
 </script></body></html>`
+}
+
+// ---------------------------------------------------------------------------
+// renderStatic — produces a complete, self-contained HTML document for a
+// single static feed post (no carousel track, no swipe JS, no progress bar).
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// renderStorySequence — 9:16 story format (420×747px, story chrome baked in)
+// ---------------------------------------------------------------------------
+
+export function renderStorySequence(params: {
+  brief: CreativeBrief
+  palette: ColorPalette
+  fontPair: FontPair
+  clientName: string
+  instagramHandle?: string
+  logoUrls?: BrandLogos
+  websiteUrl?: string
+}): string {
+  const { brief, palette, fontPair, clientName, instagramHandle, logoUrls } = params
+  const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
+  const totalSlides = brief.slides.length
+  const fontUrl = buildFontUrl(fontPair)
+
+  // Render each slide with baked-in story chrome (progress bars, header, tap arrow)
+  const slidesHtml = brief.slides
+    .map((slide) => {
+      const isDark = slide.background !== 'light'
+      const bgValue = storySlideBackground(slide.background, palette)
+
+      const renderFn = LAYOUT_REGISTRY[slide.layout_type]
+      const innerHtml = renderFn
+        ? renderFn({ slide, palette, fontPair, slideIndex: slide.index, totalSlides, logoUrls })
+        : (LAYOUT_REGISTRY['story_full_text']?.({ slide, palette, fontPair, slideIndex: slide.index, totalSlides, logoUrls }) ?? '')
+
+      return `<div class="story-slide" style="background:${bgValue};">
+  ${storyProgressBars(slide.index, totalSlides)}
+  ${storyHeader(handle, palette, isDark, logoUrls, fontPair)}
+  ${slide.has_arrow ? storyTapArrow(isDark) : ''}
+  ${innerHtml}
+</div>`
+    })
+    .join('')
+
+  const dotsHtml = Array.from({ length: totalSlides }, (_, i) =>
+    `<div class="dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})"></div>`
+  ).join('')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=420">
+<link href="${fontUrl}" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px 0;font-family:'${fontPair.body}',sans-serif;}
+.serif{font-family:'${fontPair.heading}',sans-serif;}
+.sans{font-family:'${fontPair.body}',sans-serif;}
+.phone-frame{width:420px;height:747px;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.08);position:relative;}
+.story-viewport{width:420px;height:747px;overflow:hidden;position:relative;cursor:grab;}
+.story-viewport:active{cursor:grabbing;}
+.story-track{display:flex;height:100%;transition:transform 0.35s cubic-bezier(.4,0,.2,1);}
+.story-slide{width:420px;min-width:420px;height:747px;position:relative;overflow:hidden;}
+.preview-dots{display:flex;gap:8px;justify-content:center;margin-top:18px;}
+.preview-dots .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);transition:background 0.3s,transform 0.3s;cursor:pointer;}
+.preview-dots .dot.active{background:${palette.brand_accent};transform:scale(1.3);}
+.slide-counter{color:rgba(255,255,255,0.4);font-family:'${fontPair.heading}',sans-serif;font-size:12px;margin-top:12px;letter-spacing:1px;text-align:center;}
+</style>
+</head><body>
+<div class="phone-frame">
+  <div class="story-viewport" id="viewport">
+    <div class="story-track" id="track">${slidesHtml}</div>
+  </div>
+</div>
+<div class="preview-dots">${dotsHtml}</div>
+<div class="slide-counter" id="counter">1 / ${totalSlides}</div>
+<script>
+var startX=0,currentX=0,isDragging=false,currentSlide=0;
+var track=document.getElementById('track');
+var viewport=document.getElementById('viewport');
+var totalSlides=${totalSlides};
+var slideWidth=420;
+function goToSlide(idx){currentSlide=Math.max(0,Math.min(idx,totalSlides-1));track.style.transition='transform 0.35s cubic-bezier(.4,0,.2,1)';track.style.transform='translateX('+(-currentSlide*slideWidth)+'px)';updateDots();}
+function updateDots(){document.querySelectorAll('.dot').forEach(function(d,i){d.classList.toggle('active',i===currentSlide);});document.getElementById('counter').textContent=(currentSlide+1)+' / '+totalSlides;}
+viewport.addEventListener('pointerdown',function(e){isDragging=true;startX=e.clientX;track.style.transition='none';viewport.setPointerCapture(e.pointerId);});
+viewport.addEventListener('pointermove',function(e){if(!isDragging)return;currentX=e.clientX-startX;track.style.transform='translateX('+(-currentSlide*slideWidth+currentX)+'px)';});
+viewport.addEventListener('pointerup',function(){if(!isDragging)return;isDragging=false;var threshold=slideWidth*0.2;if(currentX<-threshold&&currentSlide<totalSlides-1){goToSlide(currentSlide+1);}else if(currentX>threshold&&currentSlide>0){goToSlide(currentSlide-1);}else{goToSlide(currentSlide);}currentX=0;});
+document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')goToSlide(currentSlide+1);if(e.key==='ArrowLeft')goToSlide(currentSlide-1);});
+</script>
+</body></html>`
 }
 
 // ---------------------------------------------------------------------------

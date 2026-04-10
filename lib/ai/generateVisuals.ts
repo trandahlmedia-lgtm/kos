@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { callClaude, extractJSON, MODEL } from '@/lib/ai/claude'
 import { logAIRun } from '@/lib/ai/costTracker'
 import { getVisualPlanSystem, buildVisualPlanUser } from '@/lib/ai/prompts/visualPlan'
-import { deriveColorPalette, renderCarousel, renderStatic } from '@/lib/visual-engine'
+import { deriveColorPalette, renderCarousel, renderStatic, renderStorySequence } from '@/lib/visual-engine'
 import { adminClient } from '@/lib/supabase/admin'
 import type { PostVisual, CreativeBrief, FontPair, BrandLogos } from '@/types'
 
@@ -137,7 +137,7 @@ export async function generateVisualForPost(
 
   // 5. Build the angle from post data
   const postAngle = post.angle ?? post.ai_reasoning ?? 'General brand awareness post'
-  const format = (post.format ?? 'carousel') as 'carousel' | 'static'
+  const format = (post.format ?? 'carousel') as 'carousel' | 'static' | 'story_sequence'
   const placement = (post.placement ?? 'feed') as 'feed' | 'story'
   const contentType = (post.content_type ?? 'trust') as string
 
@@ -195,11 +195,14 @@ export async function generateVisualForPost(
       }
     }
 
-    // 9. Render HTML — carousel or static based on format
+    // 9. Render HTML — carousel, static, or story_sequence based on format
     const renderParams = { brief, palette, fontPair, clientName, instagramHandle, logoUrls, websiteUrl }
-    const generatedHtml = format === 'static'
-      ? renderStatic(renderParams)
-      : renderCarousel(renderParams)
+    const generatedHtml =
+      format === 'static'
+        ? renderStatic(renderParams)
+        : format === 'story_sequence'
+        ? renderStorySequence(renderParams)
+        : renderCarousel(renderParams)
 
     // 9. Collect all photo slots across slides
     const allPhotoSlots = brief.slides

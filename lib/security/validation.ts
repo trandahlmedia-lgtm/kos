@@ -169,6 +169,18 @@ export const saveClaudeMdSchema = z.object({
     .max(100_000, 'Brand document exceeds the 100 KB limit. Please shorten it.'),
 })
 
+/** Updating client brand assets (logo + IG handle). */
+export const updateBrandAssetsSchema = z.object({
+  clientId: z.string().uuid('Invalid client ID'),
+  logo_url: z.string().max(1000, 'Logo URL too long').optional().or(z.literal('').transform(() => undefined)),
+  instagram_handle: z
+    .string()
+    .max(30, 'Instagram handle must be 30 characters or fewer')
+    .trim()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+})
+
 /** Toggling an onboarding step. */
 export const toggleOnboardingSchema = z.object({
   stepId: z.string().uuid('Invalid step ID'),

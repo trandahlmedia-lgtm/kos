@@ -28,6 +28,7 @@ export async function POST(request: Request) {
   const file = formData.get('file') as File | null
   const postId = formData.get('postId') as string | null
   const clientId = formData.get('clientId') as string | null
+  const category = (formData.get('category') as string | null) ?? 'creative'
 
   if (!file || !clientId) {
     return NextResponse.json({ error: 'Missing file or clientId' }, { status: 400 })
@@ -64,9 +65,11 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer())
     const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
     const baseName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    const folder = postId
-      ? `${clientId}/creatives/${postId}`
-      : `${clientId}/creatives`
+    const folder = category === 'brand_asset'
+      ? `${clientId}/brand`
+      : postId
+        ? `${clientId}/creatives/${postId}`
+        : `${clientId}/creatives`
     const storagePath = `${folder}/${baseName}`
 
     // 5. Upload original to Supabase storage
@@ -135,7 +138,7 @@ export async function POST(request: Request) {
         media_type: isVideo ? 'video' : 'image',
         file_size_bytes: file.size,
         mime_type: file.type,
-        category: 'creative',
+        category: category === 'brand_asset' ? 'brand_asset' : 'creative',
         uploaded_by: user.id,
       })
       .select('id')

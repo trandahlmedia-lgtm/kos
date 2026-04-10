@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ClaudeMdEditor } from './ClaudeMdEditor'
 import { OnboardingChecklist } from './OnboardingChecklist'
+import { BrandAssetsPanel } from './BrandAssetsPanel'
 import { EditClientDialog } from './EditClientDialog'
 import { ClientStatusDot } from '@/components/shared/StatusBadge'
 import { type Client, type OnboardingStep } from '@/types'
@@ -66,13 +67,13 @@ export function ClientHubClient({
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-transparent border-b border-[#2a2a2a] rounded-none p-0 h-auto gap-0 w-full justify-start">
-          {['overview', 'brand', 'onboarding'].map((tab) => (
+          {['overview', 'brand', 'brand-kit', 'onboarding'].map((tab) => (
             <TabsTrigger
               key={tab}
               value={tab}
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#E8732A] data-[state=active]:text-white data-[state=active]:bg-transparent text-[#555555] hover:text-[#999999] px-4 pb-3 text-sm font-medium capitalize transition-colors"
             >
-              {tab === 'brand' ? 'Brand Doc' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'brand' ? 'Brand Doc' : tab === 'brand-kit' ? 'Brand Kit' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -133,7 +134,16 @@ export function ClientHubClient({
           <ClaudeMdEditor clientId={client.id} initialValue={client.claude_md ?? ''} />
         </TabsContent>
 
-        {/* Tab 3 — Onboarding */}
+        {/* Tab 3 — Brand Kit */}
+        <TabsContent value="brand-kit">
+          <BrandAssetsPanel
+            clientId={client.id}
+            logoUrl={client.logo_url ?? null}
+            instagramHandle={client.instagram_handle ?? null}
+          />
+        </TabsContent>
+
+        {/* Tab 4 — Onboarding */}
         <TabsContent value="onboarding">
           <OnboardingChecklist
             steps={onboardingSteps}

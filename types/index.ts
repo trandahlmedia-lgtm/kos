@@ -48,6 +48,8 @@ export interface Client {
   ads_eligible_at?: string
   client_since_days?: number
   last_post_at?: string
+  logo_url?: string
+  instagram_handle?: string
   notes?: string
   created_by?: string
   created_at: string

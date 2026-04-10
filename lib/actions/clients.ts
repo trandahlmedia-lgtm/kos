@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import {
   createClientSchema,
   updateClientSchema,
+  updateBrandAssetsSchema,
   formatZodErrors,
 } from '@/lib/security/validation'
 import {
@@ -235,4 +236,61 @@ export async function updateClientAction(
 
   revalidatePath(`/clients/${idResult.data}`)
   revalidatePath('/clients')
+}
+
+// ---------------------------------------------------------------------------
+// updateClientBrandAssets
+// ---------------------------------------------------------------------------
+
+/**
+ * Update a client's brand asset fields (logo_url, instagram_handle).
+ *
+ * Security:
+ *   1. Auth re-verification
+ *   2. UUID validation on clientId
+ *   3. Rate limit: USER_WRITE
+ *   4. Zod validation on all fields
+ */
+export async function updateClientBrandAssets(
+  clientId: string,
+  input: { logo_url?: string; instagram_handle?: string }
+): Promise<void> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const parsed = updateBrandAssetsSchema.safeParse({ clientId, ...input })
+  if (!parsed.success) {
+    throw new Error(formatZodErrors(parsed.error.issues))
+  }
+
+  const { clientId: validId, ...clean } = parsed.data
+
+  const rl = await checkRateLimit(
+    userAction(user.id, 'update_client_brand'),
+    LIMITS.USER_WRITE.max,
+    LIMITS.USER_WRITE.windowS
+  )
+  if (!rl.allowed) {
+    const secs = rl.retryAfter
+    throw new Error(`Rate limit exceeded. Please wait ${secs} second${secs !== 1 ? 's' : ''} and try again.`)
+  }
+
+  const { error } = await supabase
+    .from('clients')
+    .update({
+      ...(clean.logo_url !== undefined && { logo_url: clean.logo_url ?? null }),
+      ...(clean.instagram_handle !== undefined && { instagram_handle: clean.instagram_handle ?? null }),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', validId)
+
+  if (error) {
+    console.error('[updateClientBrandAssets] DB update failed:', error)
+    throw new Error('Failed to update brand assets. Please try again.')
+  }
+
+  revalidatePath(`/clients/${validId}`)
 }

@@ -22,6 +22,10 @@ function injectEditingScript(html: string): string {
 [data-field].editing{outline:1px solid #E8732A;outline-offset:4px;box-shadow:0 0 0 4px rgba(232,115,42,.1)}
 [data-field]:focus{outline:1px solid #E8732A;outline-offset:4px}
 .__kos-tip{position:absolute;top:-24px;left:50%;transform:translateX(-50%);background:#E8732A;color:#fff;font-size:10px;font-family:sans-serif;padding:2px 6px;border-radius:3px;white-space:nowrap;pointer-events:none;z-index:9999}
+[data-photo-slot]{cursor:pointer;position:relative;transition:border-color .15s}
+[data-photo-slot]:hover{border-color:rgba(232,115,42,.6)!important}
+.__kos-photo-tip{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(232,115,42,.08);border-radius:inherit;pointer-events:none;z-index:9998}
+.__kos-photo-tip span{font-size:11px;color:#E8732A;font-family:sans-serif;letter-spacing:.3px}
 </style>
 <script id="__kos-edit-script">(function(){
 var SL=['heading','tag','cta','stat'];
@@ -56,13 +60,45 @@ document.querySelectorAll('[data-field]').forEach(function(el){
     el.addEventListener(ev,function(e){e.stopPropagation();});
   });
 });
+document.querySelectorAll('[data-photo-slot]').forEach(function(el){
+  var tip=null;
+  function rmTip(){if(tip){tip.remove();tip=null;}}
+  el.addEventListener('mouseenter',function(){
+    if(tip)return;
+    tip=document.createElement('div');
+    tip.className='__kos-photo-tip';
+    tip.innerHTML='<span>\uD83D\uDCF7 Click to upload</span>';
+    el.appendChild(tip);
+  });
+  el.addEventListener('mouseleave',rmTip);
+  el.addEventListener('click',function(e){
+    e.stopPropagation();rmTip();
+    var slotId=el.dataset.photoSlot||'';
+    var m=slotId.match(/slide-(\d+)/);
+    window.parent.postMessage({type:'photo-slot-clicked',slotId:slotId,slideIndex:m?parseInt(m[1],10):0},'*');
+  });
+});
 window.addEventListener('message',function(e){
-  if(!e.data||e.data.type!=='request-full-html')return;
+  if(!e.data)return;
+  if(e.data.type==='photo-uploaded'){
+    var slot=document.querySelector('[data-photo-slot="'+e.data.slotId+'"]');
+    if(!slot)return;
+    slot.style.backgroundImage='url('+e.data.url+')';
+    slot.style.backgroundSize='cover';
+    slot.style.backgroundPosition='center';
+    slot.style.border='none';
+    slot.innerHTML='';
+    var m2=(e.data.slotId||'').match(/slide-(\d+)/);
+    window.parent.postMessage({type:'photo-updated',slotId:e.data.slotId,slideIndex:m2?parseInt(m2[1],10):0},'*');
+    return;
+  }
+  if(e.data.type!=='request-full-html')return;
   var c=document.documentElement.cloneNode(true);
   var s=c.querySelector('#__kos-edit-style');if(s)s.remove();
   var sc=c.querySelector('#__kos-edit-script');if(sc)sc.remove();
   c.querySelectorAll('[contenteditable]').forEach(function(n){n.removeAttribute('contenteditable');});
   c.querySelectorAll('.editing').forEach(function(n){n.classList.remove('editing');});
+  c.querySelectorAll('.__kos-tip,.__kos-photo-tip').forEach(function(n){n.remove();});
   window.parent.postMessage({type:'full-html-response',html:'<!DOCTYPE html>'+c.outerHTML},'*');
 });
 })();</script>`
@@ -96,6 +132,8 @@ export function VisualPreviewModal({
   const router = useRouter()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const pendingSaveResolveRef = useRef<((html: string) => void) | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const pendingSlotIdRef = useRef<string | null>(null)
 
   const [visual, setVisual] = useState<PostVisual | null>(null)
   const [loading, setLoading] = useState(false)
@@ -157,6 +195,15 @@ export function VisualPreviewModal({
         setHasUnsavedEdits(true)
       }
 
+      if (msg.type === 'photo-slot-clicked' && typeof msg.slotId === 'string') {
+        pendingSlotIdRef.current = msg.slotId
+        fileInputRef.current?.click()
+      }
+
+      if (msg.type === 'photo-updated') {
+        setHasUnsavedEdits(true)
+      }
+
       if (msg.type === 'full-html-response' && typeof msg.html === 'string') {
         pendingSaveResolveRef.current?.(msg.html)
         pendingSaveResolveRef.current = null
@@ -185,6 +232,39 @@ export function VisualPreviewModal({
     // Prevent toggling off while there are unsaved changes
     if (hasUnsavedEdits) return
     setEditMode((prev) => !prev)
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const slotId = pendingSlotIdRef.current
+    // Reset so the same file can be re-selected next time
+    e.target.value = ''
+    if (!file || !slotId || !visual?.client_id || !iframeRef.current?.contentWindow) return
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('clientId', visual.client_id)
+      formData.append('postId', postId)
+      formData.append('category', 'creative')
+
+      const res = await fetch('/api/media/upload', { method: 'POST', body: formData })
+      const data = await res.json() as { originalUrl?: string; error?: string }
+
+      if (!res.ok || !data.originalUrl) {
+        setError(data.error ?? 'Photo upload failed.')
+        return
+      }
+
+      iframeRef.current.contentWindow.postMessage(
+        { type: 'photo-uploaded', slotId, url: data.originalUrl },
+        '*'
+      )
+    } catch {
+      setError('Photo upload failed.')
+    } finally {
+      pendingSlotIdRef.current = null
+    }
   }
 
   async function handleSaveEdits() {
@@ -452,6 +532,15 @@ export function VisualPreviewModal({
           Close
         </button>
       </div>
+
+      {/* Hidden file input for photo slot uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoUpload}
+      />
     </div>
   )
 }

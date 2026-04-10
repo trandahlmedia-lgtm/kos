@@ -1,4 +1,4 @@
-import { buildBrandGradient } from './colorDerivation'
+import { buildBrandGradient, hexToRgbStr } from './colorDerivation'
 import type { ColorPalette, FontPair, SlideContent, BrandLogos } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -110,6 +110,14 @@ function wrapSlide(
 }
 
 // ---------------------------------------------------------------------------
+// Static slide wrapper — no progress bar, no swipe arrow
+// ---------------------------------------------------------------------------
+
+function wrapStaticSlide(innerHtml: string, palette: ColorPalette): string {
+  return `<div class="slide" style="background:${palette.dark_bg};">${innerHtml}</div>`
+}
+
+// ---------------------------------------------------------------------------
 // Tag label — accent on light, accent_light on dark/gradient
 // ---------------------------------------------------------------------------
 
@@ -170,6 +178,32 @@ function renderIconWatermark(
 ): string {
   if (placement !== 'icon' || !logoUrls?.icon) return ''
   return `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.05;z-index:0;pointer-events:none;"><img src="${esc(logoUrls.icon)}" style="max-height:200px;max-width:200px;object-fit:contain;" alt=""></div>`
+}
+
+// ---------------------------------------------------------------------------
+// Static post helpers — logo top-right, CTA footer bar, full-zone photo slot
+// ---------------------------------------------------------------------------
+
+/** Logo lockup top-right with glow — for static post layouts */
+function renderLogoTopRight(logoUrls: BrandLogos | undefined): string {
+  const url = logoUrls?.full ?? logoUrls?.wordmark_light
+  if (!url) return ''
+  return `<img src="${esc(url)}" style="position:absolute;top:16px;right:16px;height:44px;max-width:140px;object-fit:contain;z-index:10;filter:drop-shadow(0 0 8px rgba(255,255,255,0.5)) drop-shadow(0 0 16px rgba(255,255,255,0.25));" alt="">`
+}
+
+/** CTA footer bar — full-width, 48px, accent bg, cta text left + phone number right */
+function renderCtaFooter(
+  cta: SlideContent['cta'],
+  palette: ColorPalette
+): string {
+  const ctaText = cta?.text ?? 'Call Today'
+  const phone = cta?.subtitle ?? ''
+  return `<div style="height:48px;background:${palette.brand_accent};display:flex;justify-content:space-between;align-items:center;padding:0 28px;flex-shrink:0;"><span class="sans" style="font-size:11px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;text-transform:uppercase;">${esc(ctaText)}</span>${phone ? `<span class="sans" style="font-size:13px;font-weight:700;color:#FFFFFF;">${esc(phone)}</span>` : ''}</div>`
+}
+
+/** Full-zone photo placeholder for static layouts — fills its positioned container, no border-radius */
+function renderStaticPhotoZone(slot: { slot_id: string; label: string }): string {
+  return `<div data-slot-id="${esc(slot.slot_id)}" style="position:absolute;inset:0;background:rgba(255,255,255,0.04);border:2px dashed rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;"><span class="sans" style="font-size:11px;color:rgba(255,255,255,0.25);letter-spacing:0.5px;text-align:center;padding:0 20px;">📷 ${esc(slot.label).toUpperCase()}</span></div>`
 }
 
 // ---------------------------------------------------------------------------
@@ -590,6 +624,58 @@ const ctaFinal: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logo
 }
 
 // ---------------------------------------------------------------------------
+// 15. static_photo_top — photo top ~62%, gradient bridge, content zone, CTA footer
+// ---------------------------------------------------------------------------
+
+const staticPhotoTop: SlideRenderFn = ({ slide, palette, logoUrls }) => {
+  const slot = slide.photo_slots?.[0] ?? { slot_id: 'static-photo-0', label: 'Main Photo' }
+  const deepBg = palette.dark_bg
+
+  const inner = `<div style="height:100%;display:flex;flex-direction:column;">
+    <div style="position:relative;height:325px;flex-shrink:0;overflow:hidden;">
+      ${renderLogoTopRight(logoUrls)}
+      ${renderStaticPhotoZone(slot)}
+      <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(to bottom,transparent,${deepBg});pointer-events:none;z-index:1;"></div>
+    </div>
+    <div style="flex:1;background:${deepBg};padding:18px 28px 20px;display:flex;flex-direction:column;justify-content:center;">
+      ${renderTag(slide.tag_label, 'dark', palette)}
+      <h1 class="serif" style="font-size:24px;font-weight:800;color:#FFFFFF;line-height:1.1;letter-spacing:-0.3px;margin-bottom:8px;">${esc(slide.heading)}</h1>
+      ${slide.body ? `<p class="sans" style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.5;">${formatText(slide.body)}</p>` : ''}
+    </div>
+    ${renderCtaFooter(slide.cta, palette)}
+  </div>`
+
+  return wrapStaticSlide(inner, palette)
+}
+
+// ---------------------------------------------------------------------------
+// 16. static_full_bleed — full-bleed photo with gradient overlay, content at bottom, CTA footer
+// ---------------------------------------------------------------------------
+
+const staticFullBleed: SlideRenderFn = ({ slide, palette, logoUrls }) => {
+  const slot = slide.photo_slots?.[0] ?? { slot_id: 'static-photo-0', label: 'Main Photo' }
+  const deepBg = palette.dark_bg
+  const deepRgb = hexToRgbStr(deepBg)
+  const overlayGradient = `linear-gradient(to bottom,rgba(${deepRgb},0.25) 0%,rgba(${deepRgb},0.15) 35%,rgba(${deepRgb},0.55) 60%,rgba(${deepRgb},0.92) 80%,rgba(${deepRgb},0.98) 100%)`
+
+  const inner = `<div style="height:100%;display:flex;flex-direction:column;">
+    <div style="position:relative;flex:1;overflow:hidden;">
+      ${renderLogoTopRight(logoUrls)}
+      ${renderStaticPhotoZone(slot)}
+      <div style="position:absolute;inset:0;background:${overlayGradient};pointer-events:none;"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:28px 28px 22px;">
+        ${renderTag(slide.tag_label, 'dark', palette)}
+        <h1 class="serif" style="font-size:26px;font-weight:800;color:#FFFFFF;line-height:1.1;letter-spacing:-0.3px;margin-bottom:8px;">${esc(slide.heading)}</h1>
+        ${slide.body ? `<p class="sans" style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.5;">${formatText(slide.body)}</p>` : ''}
+      </div>
+    </div>
+    ${renderCtaFooter(slide.cta, palette)}
+  </div>`
+
+  return wrapStaticSlide(inner, palette)
+}
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -608,4 +694,6 @@ export const LAYOUT_REGISTRY: Record<string, SlideRenderFn> = {
   card_stack: cardStack,
   minimal_text: minimalText,
   cta_final: ctaFinal,
+  static_photo_top: staticPhotoTop,
+  static_full_bleed: staticFullBleed,
 }

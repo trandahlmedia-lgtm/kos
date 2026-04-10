@@ -2,8 +2,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { callClaude, extractJSON, MODEL } from '@/lib/ai/claude'
 import { logAIRun } from '@/lib/ai/costTracker'
-import { VISUAL_PLAN_SYSTEM, buildVisualPlanUser } from '@/lib/ai/prompts/visualPlan'
-import { deriveColorPalette, renderCarousel } from '@/lib/visual-engine'
+import { getVisualPlanSystem, buildVisualPlanUser } from '@/lib/ai/prompts/visualPlan'
+import { deriveColorPalette, renderCarousel, renderStatic } from '@/lib/visual-engine'
 import { adminClient } from '@/lib/supabase/admin'
 import type { PostVisual, CreativeBrief, FontPair, BrandLogos } from '@/types'
 
@@ -159,7 +159,7 @@ export async function generateVisualForPost(
 
     const result = await callClaude({
       model,
-      system: VISUAL_PLAN_SYSTEM,
+      system: getVisualPlanSystem(format),
       prompt,
       maxTokens: 4096,
     })
@@ -195,16 +195,11 @@ export async function generateVisualForPost(
       }
     }
 
-    // 9. Render HTML carousel
-    const generatedHtml = renderCarousel({
-      brief,
-      palette,
-      fontPair,
-      clientName,
-      instagramHandle,
-      logoUrls,
-      websiteUrl,
-    })
+    // 9. Render HTML — carousel or static based on format
+    const renderParams = { brief, palette, fontPair, clientName, instagramHandle, logoUrls, websiteUrl }
+    const generatedHtml = format === 'static'
+      ? renderStatic(renderParams)
+      : renderCarousel(renderParams)
 
     // 9. Collect all photo slots across slides
     const allPhotoSlots = brief.slides

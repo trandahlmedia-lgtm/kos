@@ -90,3 +90,67 @@ viewport.addEventListener('pointermove',e=>{if(!dragging)return;dx=e.clientX-sta
 viewport.addEventListener('pointerup',()=>{dragging=false;track.style.transition='transform 0.35s cubic-bezier(.4,0,.2,1)';if(dx<-40)goTo(current+1);else if(dx>40)goTo(current-1);else goTo(current);});
 </script></body></html>`
 }
+
+// ---------------------------------------------------------------------------
+// renderStatic — produces a complete, self-contained HTML document for a
+// single static feed post (no carousel track, no swipe JS, no progress bar).
+// ---------------------------------------------------------------------------
+
+export function renderStatic(params: {
+  brief: CreativeBrief
+  palette: ColorPalette
+  fontPair: FontPair
+  clientName: string
+  instagramHandle?: string
+  logoUrls?: BrandLogos
+  websiteUrl?: string
+}): string {
+  const { brief, palette, fontPair, clientName, instagramHandle, logoUrls, websiteUrl } = params
+  const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
+  const fontUrl = buildFontUrl(fontPair)
+
+  const slide = brief.slides[0]
+  if (!slide) return ''
+
+  const renderFn = LAYOUT_REGISTRY[slide.layout_type]
+  const slideHtml = renderFn
+    ? renderFn({ slide, palette, fontPair, slideIndex: 0, totalSlides: 1, logoUrls })
+    : (LAYOUT_REGISTRY['minimal_text']?.({ slide, palette, fontPair, slideIndex: 0, totalSlides: 1, logoUrls }) ?? '')
+
+  const avatarUrl = logoUrls?.icon ?? logoUrls?.full
+  const headerHtml = renderHeader(clientName, handle, undefined, avatarUrl)
+  const actionsHtml = renderActions()
+  const captionHtml = renderCaption(handle, brief.caption, websiteUrl)
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=420">
+<link href="${fontUrl}" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a1a;display:flex;justify-content:center;padding:20px 0;font-family:'${fontPair.body}',sans-serif;}
+.serif{font-family:'${fontPair.heading}',sans-serif;}
+.sans{font-family:'${fontPair.body}',sans-serif;}
+.ig-frame{width:420px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3);}
+.ig-header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #eee;}
+.ig-handle{font-family:'${fontPair.heading}',sans-serif;font-size:13px;font-weight:700;color:#262626;}
+.ig-handle-sub{font-size:11px;color:#8e8e8e;font-weight:400;}
+.static-viewport{width:420px;height:525px;overflow:hidden;position:relative;}
+.slide{min-width:420px;width:420px;height:525px;position:relative;display:flex;flex-direction:column;overflow:hidden;}
+.ig-actions{display:flex;align-items:center;padding:8px 14px 4px;gap:16px;}
+.ig-bookmark{margin-left:auto;}
+.ig-caption{padding:6px 14px 14px;font-size:13px;color:#262626;line-height:1.4;}
+.ig-caption strong{font-weight:600;}
+.ig-caption .time{display:block;margin-top:6px;font-size:10px;color:#8e8e8e;letter-spacing:0.5px;}
+</style>
+</head><body>
+<div class="ig-frame">
+  ${headerHtml}
+  <div class="static-viewport">${slideHtml}</div>
+  ${actionsHtml}
+  ${captionHtml}
+</div>
+</body></html>`
+}

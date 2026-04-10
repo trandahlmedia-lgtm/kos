@@ -14,8 +14,10 @@ export function renderCarousel(params: {
   fontPair: FontPair
   clientName: string
   instagramHandle?: string
+  logoUrl?: string
+  websiteUrl?: string
 }): string {
-  const { brief, palette, fontPair, clientName, instagramHandle } = params
+  const { brief, palette, fontPair, clientName, instagramHandle, logoUrl, websiteUrl } = params
   const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
   const totalSlides = brief.slides.length
   const fontUrl = buildFontUrl(fontPair)
@@ -35,10 +37,10 @@ export function renderCarousel(params: {
     })
     .join('')
 
-  const headerHtml = renderHeader(clientName, handle)
+  const headerHtml = renderHeader(clientName, handle, undefined, logoUrl)
   const dotsHtml = renderDots(totalSlides)
   const actionsHtml = renderActions()
-  const captionHtml = renderCaption(handle, brief.caption)
+  const captionHtml = renderCaption(handle, brief.caption, websiteUrl)
 
   return `<!DOCTYPE html>
 <html lang="en">

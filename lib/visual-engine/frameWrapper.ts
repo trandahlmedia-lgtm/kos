@@ -17,15 +17,19 @@ function esc(str: string | undefined): string {
  * Profile header row — avatar circle with initial + handle + location.
  * Uses class="serif" so it picks up the heading font defined in the document CSS.
  */
-export function renderHeader(clientName: string, handle?: string, location?: string): string {
+export function renderHeader(clientName: string, handle?: string, location?: string, logoUrl?: string): string {
   const initial = clientName.charAt(0).toUpperCase()
   const displayHandle = handle ? esc(handle) : esc(clientName.toLowerCase().replace(/\s+/g, ''))
   const loc = location ?? ''
 
-  return `<div class="ig-header">
-    <div style="width:32px;height:32px;border-radius:50%;background:#262626;display:flex;align-items:center;justify-content:center;">
+  const avatarHtml = logoUrl
+    ? `<img src="${esc(logoUrl)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="${esc(clientName)}">`
+    : `<div style="width:32px;height:32px;border-radius:50%;background:#262626;display:flex;align-items:center;justify-content:center;">
       <span style="font-size:14px;font-weight:700;color:#fff;line-height:1;">${esc(initial)}</span>
-    </div>
+    </div>`
+
+  return `<div class="ig-header">
+    ${avatarHtml}
     <div><div class="ig-handle">${displayHandle}${loc ? `<br><span class="ig-handle-sub">${esc(loc)}</span>` : ''}</div></div>
   </div>`
 }
@@ -62,9 +66,12 @@ export function renderActions(): string {
 /**
  * Caption row — bold handle + caption text + timestamp.
  */
-export function renderCaption(handle: string, caption: string): string {
+export function renderCaption(handle: string, caption: string, websiteUrl?: string): string {
   const displayHandle = esc(handle)
   const displayCaption = esc(caption)
+  const websiteHtml = websiteUrl
+    ? `<span style="display:block;margin-top:4px;font-size:11px;color:#00376b;">${esc(websiteUrl)}</span>`
+    : ''
 
-  return `<div class="ig-caption"><strong>${displayHandle}</strong> ${displayCaption}<span class="time">2 HOURS AGO</span></div>`
+  return `<div class="ig-caption"><strong>${displayHandle}</strong> ${displayCaption}${websiteHtml}<span class="time">2 HOURS AGO</span></div>`
 }

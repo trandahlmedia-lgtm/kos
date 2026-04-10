@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { generateVisualForPost } from '@/lib/ai/generateVisuals'
-import type { PostVisual } from '@/types'
+import type { PostVisual, DirectSlide } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Auth helper
@@ -103,6 +103,43 @@ export async function deleteVisualAction(
     if (updateError) {
       console.error('[deleteVisualAction] update failed:', updateError)
       throw new Error('Failed to reset post status')
+    }
+
+    revalidatePath('/content')
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Something went wrong'
+    return { success: false, error: message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// updateVisualHtmlAction
+// ---------------------------------------------------------------------------
+
+export async function updateVisualHtmlAction(
+  postId: string,
+  slideHtml: DirectSlide[],
+  generatedHtml: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await requireAuth()
+
+    const idResult = z.string().uuid().safeParse(postId)
+    if (!idResult.success) throw new Error('Invalid post ID')
+
+    const { error } = await supabase
+      .from('post_visuals')
+      .update({
+        slide_html: slideHtml,
+        generated_html: generatedHtml,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('post_id', idResult.data)
+
+    if (error) {
+      console.error('[updateVisualHtmlAction] update failed:', error)
+      throw new Error('Failed to save visual edits')
     }
 
     revalidatePath('/content')

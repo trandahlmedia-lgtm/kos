@@ -1,10 +1,78 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { X, RefreshCw, Download, Loader2, Trash2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { X, RefreshCw, Download, Loader2, Trash2, Pencil, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { getVisualForPost, generateVisualAction, deleteVisualAction } from '@/lib/actions/visuals'
+import {
+  getVisualForPost,
+  generateVisualAction,
+  deleteVisualAction,
+  updateVisualHtmlAction,
+} from '@/lib/actions/visuals'
 import type { PostVisual } from '@/types'
+
+// ---------------------------------------------------------------------------
+// Editing script injection
+// ---------------------------------------------------------------------------
+
+function injectEditingScript(html: string): string {
+  const injection = `<style id="__kos-edit-style">
+[data-field]{transition:outline .15s,box-shadow .15s;cursor:text;position:relative}
+[data-field]:hover{outline:1px dashed rgba(232,115,42,.5);outline-offset:4px}
+[data-field].editing{outline:1px solid #E8732A;outline-offset:4px;box-shadow:0 0 0 4px rgba(232,115,42,.1)}
+[data-field]:focus{outline:1px solid #E8732A;outline-offset:4px}
+.__kos-tip{position:absolute;top:-24px;left:50%;transform:translateX(-50%);background:#E8732A;color:#fff;font-size:10px;font-family:sans-serif;padding:2px 6px;border-radius:3px;white-space:nowrap;pointer-events:none;z-index:9999}
+</style>
+<script id="__kos-edit-script">(function(){
+var SL=['heading','tag','cta','stat'];
+document.querySelectorAll('[data-field]').forEach(function(el){
+  var orig='',tip=null;
+  function rmTip(){if(tip){tip.remove();tip=null;}}
+  el.addEventListener('mouseenter',function(){
+    if(el.contentEditable==='true')return;
+    tip=document.createElement('span');
+    tip.className='__kos-tip';tip.textContent='Click to edit';el.appendChild(tip);
+  });
+  el.addEventListener('mouseleave',rmTip);
+  el.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(el.contentEditable==='true')return;
+    rmTip();orig=el.innerHTML;
+    el.contentEditable='true';el.classList.add('editing');el.focus();
+    var r=document.createRange();r.selectNodeContents(el);
+    var s=window.getSelection();if(s){s.removeAllRanges();s.addRange(r);}
+  });
+  el.addEventListener('blur',function(){
+    if(el.contentEditable!=='true')return;
+    el.contentEditable='false';el.classList.remove('editing');
+    window.parent.postMessage({type:'slide-text-edit',slideIndex:parseInt(el.dataset.slide||'0',10),field:el.dataset.field,value:el.innerHTML},'*');
+  });
+  el.addEventListener('keydown',function(e){
+    e.stopPropagation();
+    if(e.key==='Enter'&&SL.indexOf(el.dataset.field)!==-1){e.preventDefault();el.blur();return;}
+    if(e.key==='Escape'){el.innerHTML=orig;el.contentEditable='false';el.classList.remove('editing');rmTip();}
+  });
+  ['pointerdown','pointermove','pointerup'].forEach(function(ev){
+    el.addEventListener(ev,function(e){e.stopPropagation();});
+  });
+});
+window.addEventListener('message',function(e){
+  if(!e.data||e.data.type!=='request-full-html')return;
+  var c=document.documentElement.cloneNode(true);
+  var s=c.querySelector('#__kos-edit-style');if(s)s.remove();
+  var sc=c.querySelector('#__kos-edit-script');if(sc)sc.remove();
+  c.querySelectorAll('[contenteditable]').forEach(function(n){n.removeAttribute('contenteditable');});
+  c.querySelectorAll('.editing').forEach(function(n){n.classList.remove('editing');});
+  window.parent.postMessage({type:'full-html-response',html:'<!DOCTYPE html>'+c.outerHTML},'*');
+});
+})();</script>`
+
+  return html.replace(/<\/body>/i, injection + '\n</body>')
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 interface VisualPreviewModalProps {
   postId: string
@@ -26,16 +94,27 @@ export function VisualPreviewModal({
   onClose,
 }: VisualPreviewModalProps) {
   const router = useRouter()
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const pendingSaveResolveRef = useRef<((html: string) => void) | null>(null)
+
   const [visual, setVisual] = useState<PostVisual | null>(null)
   const [loading, setLoading] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [hasUnsavedEdits, setHasUnsavedEdits] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
-  // Fetch visual data when modal opens
+  // Fetch visual data when modal opens; reset edit state on close
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      setEditMode(false)
+      setHasUnsavedEdits(false)
+      return
+    }
     setLoading(true)
     setError('')
     getVisualForPost(postId)
@@ -44,12 +123,21 @@ export function VisualPreviewModal({
       .finally(() => setLoading(false))
   }, [isOpen, postId])
 
-  // Blob URL lifecycle — create/revoke in effect keyed to HTML content
+  const isDirectMode = visual?.generation_mode === 'direct'
+
+  // Build rendered HTML (inject editing script when in edit mode)
   const generatedHtml = visual?.generated_html ?? null
+  const htmlToRender = useMemo(() => {
+    if (!generatedHtml) return null
+    if (editMode) return injectEditingScript(generatedHtml)
+    return generatedHtml
+  }, [generatedHtml, editMode])
+
+  // Blob URL lifecycle — create/revoke keyed to HTML content
   const iframeSrc = useMemo(() => {
-    if (!generatedHtml) return undefined
-    return URL.createObjectURL(new Blob([generatedHtml], { type: 'text/html' }))
-  }, [generatedHtml])
+    if (!htmlToRender) return undefined
+    return URL.createObjectURL(new Blob([htmlToRender], { type: 'text/html' }))
+  }, [htmlToRender])
 
   useEffect(() => {
     return () => {
@@ -57,7 +145,29 @@ export function VisualPreviewModal({
     }
   }, [iframeSrc])
 
-  // Close on Escape
+  // postMessage listener — active while edit mode is on
+  useEffect(() => {
+    if (!isOpen || !editMode) return
+
+    function handleMessage(e: MessageEvent) {
+      if (!e.data || typeof e.data !== 'object') return
+      const msg = e.data as Record<string, unknown>
+
+      if (msg.type === 'slide-text-edit') {
+        setHasUnsavedEdits(true)
+      }
+
+      if (msg.type === 'full-html-response' && typeof msg.html === 'string') {
+        pendingSaveResolveRef.current?.(msg.html)
+        pendingSaveResolveRef.current = null
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [isOpen, editMode])
+
+  // Close on Escape (keyboard events from inside the iframe don't propagate here)
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -71,7 +181,59 @@ export function VisualPreviewModal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, handleKeyDown])
 
+  function handleToggleEditMode() {
+    // Prevent toggling off while there are unsaved changes
+    if (hasUnsavedEdits) return
+    setEditMode((prev) => !prev)
+  }
+
+  async function handleSaveEdits() {
+    if (!visual || !iframeRef.current?.contentWindow) return
+    setSaving(true)
+    setError('')
+
+    try {
+      // Ask the iframe to serialize its current DOM (with injected script/style stripped)
+      const fullHtml = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          pendingSaveResolveRef.current = null
+          reject(new Error('Save timeout — the iframe did not respond.'))
+        }, 5000)
+
+        pendingSaveResolveRef.current = (html: string) => {
+          clearTimeout(timeout)
+          resolve(html)
+        }
+
+        iframeRef.current!.contentWindow!.postMessage({ type: 'request-full-html' }, '*')
+      })
+
+      const result = await updateVisualHtmlAction(
+        postId,
+        visual.slide_html ?? [],
+        fullHtml
+      )
+
+      if (!result.success) {
+        setError(result.error ?? 'Failed to save changes.')
+        return
+      }
+
+      setVisual((prev) => (prev ? { ...prev, generated_html: fullHtml } : null))
+      setHasUnsavedEdits(false)
+      setEditMode(false)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleRegenerate() {
+    setEditMode(false)
+    setHasUnsavedEdits(false)
     setRegenerating(true)
     setError('')
     try {
@@ -143,13 +305,36 @@ export function VisualPreviewModal({
             <span className="text-[#555555] text-xs italic truncate max-w-[300px]">{postMeta.angle}</span>
           )}
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Close preview"
-          className="w-8 h-8 flex items-center justify-center text-[#555555] hover:text-white transition-colors rounded"
-        >
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          {isDirectMode && iframeSrc && (
+            <button
+              onClick={handleToggleEditMode}
+              disabled={hasUnsavedEdits}
+              title={
+                hasUnsavedEdits
+                  ? 'Save or discard changes first'
+                  : editMode
+                    ? 'Exit edit mode'
+                    : 'Edit text inline'
+              }
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors disabled:opacity-50 ${
+                editMode
+                  ? 'bg-[#E8732A]/10 border-[#E8732A]/40 text-[#E8732A]'
+                  : 'border-[#2a2a2a] text-[#555555] hover:text-white hover:border-[#555555]'
+              }`}
+            >
+              <Pencil size={12} />
+              {editMode ? 'Editing' : 'Edit'}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            aria-label="Close preview"
+            className="w-8 h-8 flex items-center justify-center text-[#555555] hover:text-white transition-colors rounded"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Center content */}
@@ -168,11 +353,13 @@ export function VisualPreviewModal({
           <div className="text-sm text-[#555555]">No visual generated yet.</div>
         ) : (
           <iframe
+            key={editMode ? 'edit' : 'preview'}
+            ref={iframeRef}
             src={iframeSrc}
             title="Visual preview"
             className="rounded-md border border-[#2a2a2a] bg-white"
             style={{ width: 420, height: 700 }}
-            sandbox="allow-scripts"
+            sandbox={editMode ? 'allow-scripts allow-same-origin' : 'allow-scripts'}
           />
         )}
       </div>
@@ -189,7 +376,7 @@ export function VisualPreviewModal({
           >
             <h3 className="text-white font-medium mb-2">Delete Visual?</h3>
             <p className="text-sm text-[#999999] mb-4">
-              This will remove the visual and reset the post to "In Production".
+              This will remove the visual and reset the post to &quot;In Production&quot;.
             </p>
             <div className="flex gap-2 justify-end">
               <button
@@ -216,6 +403,22 @@ export function VisualPreviewModal({
         className="flex items-center justify-center gap-3 px-6 py-3 border-t border-[#2a2a2a]"
         onClick={(e) => e.stopPropagation()}
       >
+        {hasUnsavedEdits && (
+          <button
+            onClick={handleSaveEdits}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium bg-[#E8732A]/10 border border-[#E8732A]/40 text-[#E8732A] hover:bg-[#E8732A]/20 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        )}
+        {saveSuccess && !hasUnsavedEdits && (
+          <span className="inline-flex items-center gap-1.5 text-sm text-green-400">
+            <Check size={14} />
+            Saved
+          </span>
+        )}
         <button
           onClick={handleRegenerate}
           disabled={regenerating}

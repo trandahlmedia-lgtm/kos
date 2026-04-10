@@ -39,7 +39,9 @@ interface PostCardProps {
 
 const FORMAT_LABELS: Record<string, string> = {
   carousel: 'Carousel',
-  static: 'Static',
+  static_feed: 'Static Post',
+  story_sequence: 'Story Sequence',
+  static_story: 'Static Story',
 }
 
 const PLACEMENT_LABELS: Record<string, string> = {

@@ -54,7 +54,7 @@ export default async function ContentPage({ searchParams }: Props) {
   // Posts — queue loads all non-old posts; calendar loads just the visible week
   let postsQuery = supabase
     .from('posts')
-    .select('*, captions(*), media(id, thumbnail_path, storage_path, media_type), visual:post_visuals(*)')
+    .select('*, captions(*), media(id, thumbnail_path, storage_path, media_type), visual:post_visuals(id, post_id, client_id, generated_html, creative_brief, layout_recipe, slide_count, color_palette, photo_slots, font_pair, export_status, exported_at, notes, generation_mode, created_at, updated_at)')
 
   if (view === 'calendar') {
     postsQuery = postsQuery

@@ -40,8 +40,12 @@ export async function callClaude(params: {
     ? inputTokens * pricing.input + outputTokens * pricing.output
     : 0
 
+  if (response.content.length === 0 || response.content[0].type !== 'text') {
+    throw new Error('Claude returned empty response — try regenerating')
+  }
+
   return {
-    content: response.content[0].type === 'text' ? response.content[0].text : '',
+    content: response.content[0].text,
     usage: { inputTokens, outputTokens, costUsd },
     model,
   }

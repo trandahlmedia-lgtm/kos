@@ -414,6 +414,9 @@ export async function generateVisualDirectForPost(
     })
 
     // 8. Parse JSON response
+    if (!result.content) {
+      throw new Error('Claude returned empty response — try regenerating')
+    }
     let directBrief: DirectBriefResponse
     try {
       const jsonText = extractJSON(result.content)
@@ -557,7 +560,8 @@ export async function generateVisualDirectForPost(
       err.message.includes('Failed to save') ||
       err.message === 'Post not found' ||
       err.message.includes('brand document') ||
-      err.message.includes('empty content')
+      err.message.includes('empty content') ||
+      err.message.includes('Claude returned empty response')
     )
 
     await logAIRun({

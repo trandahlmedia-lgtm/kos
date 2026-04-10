@@ -83,15 +83,19 @@ function isWarmHue(hue: number): boolean {
 
 // --- Main derivation function ---
 
-export function deriveColorPalette(primaryHex: string): ColorPalette {
-  const { h } = hexToHsl(primaryHex)
+export function deriveColorPalette(primaryHex: string, accentHex?: string): ColorPalette {
+  const { h, s, l } = hexToHsl(primaryHex)
   const warm = isWarmHue(h)
 
   const light_bg = warm ? '#FAF8F5' : '#F5F7FA'
-  const dark_bg = warm ? '#1A1918' : '#0F172A'
+  const dark_bg = darken(primaryHex, 30)
+
+  // If no accent provided, derive a complementary/warm accent automatically
+  const brand_accent = accentHex ?? hslToHex((h + 180) % 360, Math.min(s + 0.15, 1), Math.max(l, 0.45))
 
   return {
     brand_primary: primaryHex,
+    brand_accent,
     brand_light: lighten(primaryHex, 20),
     brand_dark: darken(primaryHex, 30),
     light_bg,

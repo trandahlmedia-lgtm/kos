@@ -71,7 +71,7 @@ export function renderProgressBar(
   const safeIndex = Math.max(0, Math.min(index, safeTotal - 1))
   const pct = ((safeIndex + 1) / safeTotal) * 100
   const trackBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)'
-  const fillBg = isLight ? palette.brand_primary : '#ffffff'
+  const fillBg = isLight ? palette.brand_accent : '#ffffff'
   const counterColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.4)'
 
   return `<div style="position:absolute;bottom:0;left:0;right:0;padding:16px 28px 20px;z-index:10;display:flex;align-items:center;gap:10px;">
@@ -130,7 +130,7 @@ function renderTag(
   palette: ColorPalette
 ): string {
   if (!label) return ''
-  const tagColor = isLightSlide(bg) ? palette.brand_primary : palette.brand_light
+  const tagColor = isLightSlide(bg) ? palette.brand_accent : palette.brand_light
   return `<span class="sans" style="font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${tagColor};">${esc(label)}</span>`
 }
 
@@ -169,7 +169,7 @@ const heroStat: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =>
   const secondary = secondaryTextColor(slide.background)
   const statNum = slide.stat?.number ?? ''
   const statLabel = slide.stat?.label ?? ''
-  const statColor = isLightSlide(slide.background) ? palette.brand_primary : palette.brand_light
+  const statColor = isLightSlide(slide.background) ? palette.brand_accent : palette.brand_light
 
   const inner = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:36px 36px 52px;text-align:center;gap:8px;">
     ${renderTag(slide.tag_label, slide.background, palette)}
@@ -226,7 +226,7 @@ const problemPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }
 
 const pullQuote: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
   const primary = textColor(slide.background)
-  const barColor = palette.brand_primary
+  const barColor = isLightSlide(slide.background) ? palette.brand_accent : palette.brand_light
   const quoteText = slide.quote ?? slide.heading
 
   const inner = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:36px 36px 52px;text-align:center;gap:20px;">
@@ -285,7 +285,7 @@ const comparisonColumns: SlideRenderFn = ({ slide, palette, slideIndex, totalSli
   const right = slide.comparison?.right ?? { label: 'After', items: [] }
 
   function renderCol(col: { label: string; items: string[] }, accent: boolean): string {
-    const headerBg = accent ? palette.brand_primary : 'transparent'
+    const headerBg = accent ? palette.brand_accent : 'transparent'
     const headerColor = accent ? '#ffffff' : primary
     const items = col.items.map((item) =>
       `<div class="sans" style="font-size:13px;font-weight:400;line-height:1.4;color:${secondary};padding:8px 0;border-bottom:1px solid ${colBorder};">${esc(item)}</div>`
@@ -320,7 +320,7 @@ const timelineSteps: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides 
   const stepsHtml = steps.map((step, i) => {
     const isLast = i === steps.length - 1
     return `<div style="display:flex;gap:16px;padding:14px 0;${isLast ? '' : `border-bottom:1px solid ${dividerColor};`}">
-      <div class="sans" style="font-size:24px;font-weight:800;color:${palette.brand_primary};line-height:1;min-width:36px;">${esc(step.number)}</div>
+      <div class="sans" style="font-size:24px;font-weight:800;color:${isLightSlide(slide.background) ? palette.brand_accent : palette.brand_light};line-height:1;min-width:36px;">${esc(step.number)}</div>
       <div style="display:flex;flex-direction:column;gap:3px;">
         <div class="sans" style="font-size:14px;font-weight:600;color:${primary};line-height:1.3;">${esc(step.title)}</div>
         <div class="sans" style="font-size:12px;font-weight:400;line-height:1.4;color:${secondary};">${esc(step.description)}</div>
@@ -378,7 +378,7 @@ const statBlocks: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) 
 
   const cards = features.slice(0, 4).map((f) =>
     `<div style="flex:1;background:${cardBg};border:1px solid ${cardBorder};border-radius:12px;padding:16px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;">
-      <div class="serif" style="font-size:28px;font-weight:800;color:${palette.brand_primary};line-height:1;">${esc(f.icon)}</div>
+      <div class="serif" style="font-size:28px;font-weight:800;color:${light ? palette.brand_accent : palette.brand_light};line-height:1;">${esc(f.icon)}</div>
       <div class="sans" style="font-size:11px;font-weight:500;color:${secondary};line-height:1.3;margin-top:4px;">${esc(f.label)}</div>
     </div>`
   ).join('')
@@ -510,7 +510,7 @@ const ctaFinal: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =>
       <span class="serif" style="font-size:22px;font-weight:700;color:${primary};letter-spacing:-0.3px;">${esc(slide.heading)}</span>
     </div>
     ${slide.body ? `<div class="sans" style="font-size:14px;font-weight:400;line-height:1.5;color:${secondary};max-width:300px;">${formatText(slide.body)}</div>` : ''}
-    <div style="display:inline-block;background:${palette.brand_primary};color:#ffffff;font-size:14px;font-weight:600;padding:12px 28px;border-radius:9999px;letter-spacing:0.3px;cursor:pointer;" class="sans">${esc(ctaText)}</div>
+    <div style="display:inline-block;background:${palette.brand_accent};color:#ffffff;font-size:14px;font-weight:600;padding:12px 28px;border-radius:9999px;letter-spacing:0.3px;cursor:pointer;" class="sans">${esc(ctaText)}</div>
     ${ctaSub ? `<div class="sans" style="font-size:11px;font-weight:400;color:${mutedTextColor(slide.background)};">${esc(ctaSub)}</div>` : ''}
   </div>`
 

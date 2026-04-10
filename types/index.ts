@@ -270,6 +270,7 @@ export interface PhotoSlot {
 
 export interface ColorPalette {
   brand_primary: string
+  brand_accent: string
   brand_light: string
   brand_dark: string
   light_bg: string

@@ -10,26 +10,76 @@ import type { PostVisual, CreativeBrief, FontPair } from '@/types'
 // Helpers — extract brand color and font pair from claude_md
 // ---------------------------------------------------------------------------
 
-function extractPrimaryColor(claudeMd: string): string {
-  // Look for hex color patterns, prioritizing ones near "primary" or "brand"
-  const brandColorMatch = claudeMd.match(/(?:primary|brand|accent)\s*(?:color)?[:\s]*?(#[0-9A-Fa-f]{6})/i)
-  if (brandColorMatch) return brandColorMatch[1]
+function extractBrandColors(claudeMd: string): { primary: string; accent?: string } {
+  // Try to parse a markdown table with color rows (e.g. "| Primary (Navy) | #1B3A5C |")
+  const tableColorPattern = /\|\s*([^|]+?)\s*\|\s*(#[0-9A-Fa-f]{6})\s*\|/g
+  const tableColors: Array<{ label: string; hex: string }> = []
+  let tableMatch: RegExpExecArray | null
+  while ((tableMatch = tableColorPattern.exec(claudeMd)) !== null) {
+    tableColors.push({ label: tableMatch[1].trim().toLowerCase(), hex: tableMatch[2] })
+  }
 
-  // Fall back to any hex color found
+  if (tableColors.length >= 2) {
+    const primaryRow = tableColors.find(c =>
+      /primary|dominant|main|brand\b/.test(c.label)
+    )
+    const accentRow = tableColors.find(c =>
+      /accent|cta|highlight|action|secondary/.test(c.label)
+    )
+    if (primaryRow) {
+      return { primary: primaryRow.hex, accent: accentRow?.hex }
+    }
+  }
+
+  // Fallback: line-based extraction for "Primary: #hex" or "Accent: #hex" patterns
+  const primaryMatch = claudeMd.match(/(?:primary|dominant|main\s+brand)\s*(?:\([^)]*\))?\s*[:\s|]*?(#[0-9A-Fa-f]{6})/i)
+  const accentMatch = claudeMd.match(/(?:accent|cta|highlight|action)\s*(?:\([^)]*\))?\s*[:\s|]*?(#[0-9A-Fa-f]{6})/i)
+
+  if (primaryMatch) {
+    return { primary: primaryMatch[1], accent: accentMatch?.[1] }
+  }
+
+  // Final fallback: any hex color found
   const anyHexMatch = claudeMd.match(/#[0-9A-Fa-f]{6}/)
-  if (anyHexMatch) return anyHexMatch[0]
-
-  // Default orange (Konvyrt brand)
-  return '#E8732A'
+  return { primary: anyHexMatch?.[0] ?? '#E8732A' }
 }
 
 function extractFontPair(claudeMd: string): FontPair {
-  const headingMatch = claudeMd.match(/(?:heading|display|title)\s*(?:font)?[:\s]*?["']?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i)
-  const bodyMatch = claudeMd.match(/(?:body|paragraph|text)\s*(?:font)?[:\s]*?["']?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i)
+  // Try markdown table rows first (e.g. "| Headline / Interactive | Montserrat |")
+  const fontTablePattern = /\|\s*([^|]+?)\s*\|\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s*\|/g
+  const fontRows: Array<{ label: string; font: string }> = []
+  let fontMatch: RegExpExecArray | null
+  while ((fontMatch = fontTablePattern.exec(claudeMd)) !== null) {
+    fontRows.push({ label: fontMatch[1].trim().toLowerCase(), font: fontMatch[2].trim() })
+  }
+
+  let heading: string | undefined
+  let body: string | undefined
+
+  if (fontRows.length >= 1) {
+    const headRow = fontRows.find(r =>
+      /heading|headline|display|title|interactive/.test(r.label)
+    )
+    const bodyRow = fontRows.find(r =>
+      /body|paragraph|text|copy/.test(r.label)
+    )
+    heading = headRow?.font
+    body = bodyRow?.font
+  }
+
+  // Fallback: "Heading font: Montserrat" style
+  if (!heading) {
+    const headingMatch = claudeMd.match(/(?:heading|headline|display|title)\s*(?:font)?[:\s]*?["']?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i)
+    heading = headingMatch?.[1]
+  }
+  if (!body) {
+    const bodyMatch = claudeMd.match(/(?:body|paragraph|text)\s*(?:font)?[:\s]*?["']?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i)
+    body = bodyMatch?.[1]
+  }
 
   return {
-    heading: headingMatch?.[1] ?? 'Montserrat',
-    body: bodyMatch?.[1] ?? 'Open Sans',
+    heading: heading ?? 'Montserrat',
+    body: body ?? 'Open Sans',
   }
 }
 
@@ -62,12 +112,12 @@ export async function generateVisualForPost(
     throw new Error('No brand document on file for this client')
   }
 
-  // 2. Extract brand color and font pair
-  const primaryColor = extractPrimaryColor(claudeMd)
+  // 2. Extract brand colors and font pair
+  const { primary, accent } = extractBrandColors(claudeMd)
   const fontPair = extractFontPair(claudeMd)
 
   // 3. Derive color palette
-  const palette = deriveColorPalette(primaryColor)
+  const palette = deriveColorPalette(primary, accent)
 
   // 4. Query recent layout recipes for anti-repetition
   const { data: recentVisuals } = await supabase

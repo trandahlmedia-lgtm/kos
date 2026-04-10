@@ -33,6 +33,7 @@ Rules:
 11. For "features" arrays (feature_grid, icon_grid, stat_blocks, card_stack), use relevant emoji as the "icon" field.
 12. For "stat" fields (hero_stat), use real-sounding industry stats that support the angle.
 13. For "steps" arrays (timeline_steps), number them sequentially starting from "01".
+14. The brand has TWO key colors: a primary/dominant color (used for dark backgrounds, authority) and an accent color (used for CTAs, highlights, progress bars, urgency elements). When writing the brief, consider which slides benefit from accent pops (CTA buttons, stat numbers, tag labels) vs. the primary tone (backgrounds, typography weight).
 
 CreativeBrief JSON structure:
 {

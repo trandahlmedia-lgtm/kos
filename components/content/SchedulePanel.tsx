@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Copy, Check, Sparkles, Eye, RefreshCw } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -46,6 +47,7 @@ export function SchedulePanel({
   onClose,
 }: SchedulePanelProps) {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [generatingCaption, setGeneratingCaption] = useState(false)
@@ -53,6 +55,22 @@ export function SchedulePanel({
   const [visualModalOpen, setVisualModalOpen] = useState(false)
   const [regeneratingVisual, setRegeneratingVisual] = useState(false)
   const [visualError, setVisualError] = useState('')
+
+  // Portal SSR safety
+  useEffect(() => { setMounted(true) }, [])
+
+  // Latch last known post/clientName so the modal keeps its data after the panel closes
+  const lastPostRef = useRef<Post | null>(null)
+  const lastClientNameRef = useRef<string | undefined>(undefined)
+  if (post) {
+    lastPostRef.current = post
+    lastClientNameRef.current = clientName
+  }
+
+  // Close the visual modal when the user switches to a different post
+  useEffect(() => {
+    if (post?.id) setVisualModalOpen(false)
+  }, [post?.id])
 
   const generatedHtml = post?.visual?.generated_html ?? null
   const iframeSrc = useMemo(() => {
@@ -66,7 +84,30 @@ export function SchedulePanel({
     }
   }, [iframeSrc])
 
-  if (!post) return null
+  // Portal the modal to document.body so it:
+  // 1. Escapes the Sheet's stacking context (fixes z-index layering)
+  // 2. Stays mounted even when the panel closes (post becomes null)
+  const modalPortal =
+    mounted && lastPostRef.current
+      ? createPortal(
+          <VisualPreviewModal
+            postId={lastPostRef.current.id}
+            postMeta={{
+              clientName: lastClientNameRef.current,
+              contentType: lastPostRef.current.content_type,
+              format: lastPostRef.current.format,
+              placement: lastPostRef.current.placement,
+              angle: lastPostRef.current.angle,
+            }}
+            isOpen={visualModalOpen}
+            onClose={() => setVisualModalOpen(false)}
+          />,
+          document.body
+        )
+      : null
+
+  // Return the portal alone when the panel is closed — keeps the modal alive
+  if (!post) return modalPortal
 
   const assignedProfile = post.assigned_to
     ? profiles.find((p) => p.id === post.assigned_to)
@@ -149,6 +190,7 @@ export function SchedulePanel({
     : null
 
   return (
+    <>
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="right"
@@ -350,19 +392,9 @@ export function SchedulePanel({
           </div>
         </div>
       </SheetContent>
-      <VisualPreviewModal
-        postId={post.id}
-        postMeta={{
-          clientName: clientName,
-          contentType: post.content_type,
-          format: post.format,
-          placement: post.placement,
-          angle: post.angle,
-        }}
-        isOpen={visualModalOpen}
-        onClose={() => setVisualModalOpen(false)}
-      />
     </Sheet>
+    {modalPortal}
+    </>
   )
 }
 

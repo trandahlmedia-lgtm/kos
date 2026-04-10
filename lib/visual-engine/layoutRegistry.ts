@@ -160,7 +160,7 @@ function renderLogo(
 ): string {
   const url = pickLogoUrl(placement, bg, logoUrls)
   if (!url) return ''
-  return `<div style="display:flex;justify-content:center;margin-bottom:18px;"><img src="${esc(url)}" style="max-height:${maxHeight}px;max-width:${maxWidth}px;object-fit:contain;" alt=""></div>`
+  return `<div style="display:flex;justify-content:center;margin-bottom:18px;"><img src="${esc(url)}" style="max-height:${maxHeight}px;max-width:${maxWidth}px;object-fit:contain;filter:drop-shadow(0 2px 12px rgba(255,255,255,0.15)) drop-shadow(0 0 20px rgba(255,255,255,0.08));" alt=""></div>`
 }
 
 /** Render an icon watermark (very low opacity, centered, behind content) */

@@ -23,7 +23,7 @@ export function renderHeader(clientName: string, handle?: string, location?: str
   const loc = location ?? ''
 
   const avatarHtml = logoUrl
-    ? `<img src="${esc(logoUrl)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="${esc(clientName)}">`
+    ? `<img src="${esc(logoUrl)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;filter:drop-shadow(0 2px 12px rgba(255,255,255,0.15)) drop-shadow(0 0 20px rgba(255,255,255,0.08));" alt="${esc(clientName)}">`
     : `<div style="width:32px;height:32px;border-radius:50%;background:#262626;display:flex;align-items:center;justify-content:center;">
       <span style="font-size:14px;font-weight:700;color:#fff;line-height:1;">${esc(initial)}</span>
     </div>`

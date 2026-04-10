@@ -71,6 +71,49 @@ export async function getVisualForPost(
 }
 
 // ---------------------------------------------------------------------------
+// deleteVisualAction
+// ---------------------------------------------------------------------------
+
+export async function deleteVisualAction(
+  postId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await requireAuth()
+
+    const idResult = z.string().uuid().safeParse(postId)
+    if (!idResult.success) throw new Error('Invalid post ID')
+
+    // Delete the visual
+    const { error: deleteError } = await supabase
+      .from('post_visuals')
+      .delete()
+      .eq('post_id', idResult.data)
+
+    if (deleteError) {
+      console.error('[deleteVisualAction] delete failed:', deleteError)
+      throw new Error('Failed to delete visual')
+    }
+
+    // Reset post status back to in_production
+    const { error: updateError } = await supabase
+      .from('posts')
+      .update({ status: 'in_production' })
+      .eq('id', idResult.data)
+
+    if (updateError) {
+      console.error('[deleteVisualAction] update failed:', updateError)
+      throw new Error('Failed to reset post status')
+    }
+
+    revalidatePath('/content')
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Something went wrong'
+    return { success: false, error: message }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // updatePhotoSlot
 // ---------------------------------------------------------------------------
 

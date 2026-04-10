@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Copy, Check, Sparkles, Eye, RefreshCw } from 'lucide-react'
+import { Copy, Check, Sparkles, Eye, RefreshCw, Trash2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { PostStatusBadge } from '@/components/shared/StatusBadge'
@@ -12,7 +12,7 @@ import { CaptionEditor } from './CaptionEditor'
 import { CreativeUploader } from './CreativeUploader'
 import { VisualPreviewModal } from './VisualPreviewModal'
 import { updatePostStatusAction } from '@/lib/actions/posts'
-import { generateVisualAction } from '@/lib/actions/visuals'
+import { generateVisualAction, deleteVisualAction } from '@/lib/actions/visuals'
 import { type Post, type PostStatus, type GeneratedCaptions } from '@/types'
 
 const PREVIEW_WIDTH = 280
@@ -55,6 +55,8 @@ export function SchedulePanel({
   const [visualModalOpen, setVisualModalOpen] = useState(false)
   const [regeneratingVisual, setRegeneratingVisual] = useState(false)
   const [visualError, setVisualError] = useState('')
+  const [deletingVisual, setDeletingVisual] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Portal SSR safety
   useEffect(() => { setMounted(true) }, [])
@@ -147,6 +149,25 @@ export function SchedulePanel({
       setVisualError(err instanceof Error ? err.message : 'Regeneration failed.')
     } finally {
       setRegeneratingVisual(false)
+    }
+  }
+
+  async function handleDeleteVisual() {
+    if (!post) return
+    setDeletingVisual(true)
+    setVisualError('')
+    try {
+      const result = await deleteVisualAction(post.id)
+      if (!result.success) {
+        setVisualError(result.error ?? 'Failed to delete visual.')
+        return
+      }
+      router.refresh()
+    } catch (err) {
+      setVisualError(err instanceof Error ? err.message : 'Delete failed.')
+    } finally {
+      setDeletingVisual(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -251,6 +272,14 @@ export function SchedulePanel({
                   >
                     <RefreshCw size={12} className={regeneratingVisual ? 'animate-spin' : ''} />
                     Regenerate
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={deletingVisual}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-md text-[#555555] hover:text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                    title="Delete visual"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
                 {visualError && (
@@ -390,6 +419,40 @@ export function SchedulePanel({
               <span className="ml-2 text-[10px] text-[#333333]">coming soon</span>
             </Button>
           </div>
+
+          {/* Delete confirmation dialog */}
+          {showDeleteConfirm && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={() => !deletingVisual && setShowDeleteConfirm(false)}
+            >
+              <div
+                className="bg-[#111111] border border-[#2a2a2a] rounded-md p-5 max-w-sm mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-white font-medium mb-2">Delete Visual?</h3>
+                <p className="text-sm text-[#999999] mb-4">
+                  This will remove the visual and reset the post to "In Production".
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => !deletingVisual && setShowDeleteConfirm(false)}
+                    disabled={deletingVisual}
+                    className="px-3 py-2 rounded-md text-sm font-medium border border-[#2a2a2a] text-[#999999] hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteVisual}
+                    disabled={deletingVisual}
+                    className="px-3 py-2 rounded-md text-sm font-medium bg-red-900/20 border border-red-600/50 text-red-400 hover:bg-red-900/30 hover:border-red-500/70 transition-colors disabled:opacity-50"
+                  >
+                    {deletingVisual ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

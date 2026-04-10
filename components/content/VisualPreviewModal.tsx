@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { X, RefreshCw, Download, Loader2 } from 'lucide-react'
-import { getVisualForPost, generateVisualAction } from '@/lib/actions/visuals'
+import { X, RefreshCw, Download, Loader2, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { getVisualForPost, generateVisualAction, deleteVisualAction } from '@/lib/actions/visuals'
 import type { PostVisual } from '@/types'
 
 interface VisualPreviewModalProps {
@@ -24,10 +25,13 @@ export function VisualPreviewModal({
   isOpen,
   onClose,
 }: VisualPreviewModalProps) {
+  const router = useRouter()
   const [visual, setVisual] = useState<PostVisual | null>(null)
   const [loading, setLoading] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Fetch visual data when modal opens
   useEffect(() => {
@@ -77,6 +81,25 @@ export function VisualPreviewModal({
       setError(err instanceof Error ? err.message : 'Regeneration failed.')
     } finally {
       setRegenerating(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    setError('')
+    try {
+      const result = await deleteVisualAction(postId)
+      if (!result.success) {
+        setError(result.error ?? 'Failed to delete visual.')
+        return
+      }
+      router.refresh()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed.')
+    } finally {
+      setDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
@@ -154,6 +177,40 @@ export function VisualPreviewModal({
         )}
       </div>
 
+      {/* Delete confirmation dialog */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => !deleting && setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-[#111111] border border-[#2a2a2a] rounded-md p-5 max-w-sm mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-white font-medium mb-2">Delete Visual?</h3>
+            <p className="text-sm text-[#999999] mb-4">
+              This will remove the visual and reset the post to "In Production".
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => !deleting && setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-3 py-2 rounded-md text-sm font-medium border border-[#2a2a2a] text-[#999999] hover:text-white transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-3 py-2 rounded-md text-sm font-medium bg-red-900/20 border border-red-600/50 text-red-400 hover:bg-red-900/30 hover:border-red-500/70 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom bar */}
       <div
         className="flex items-center justify-center gap-3 px-6 py-3 border-t border-[#2a2a2a]"
@@ -175,6 +232,15 @@ export function VisualPreviewModal({
           <Download size={14} />
           Export PNGs
           <span className="text-[10px] text-[#333333]">coming soon</span>
+        </button>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          disabled={deleting}
+          title="Delete visual"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium border border-[#2a2a2a] text-red-500 hover:text-red-400 hover:border-red-600/50 transition-colors disabled:opacity-50"
+        >
+          <Trash2 size={14} />
+          Delete
         </button>
         <button
           onClick={onClose}

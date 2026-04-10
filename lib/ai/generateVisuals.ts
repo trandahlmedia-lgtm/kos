@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { callClaude, extractJSON, MODEL } from '@/lib/ai/claude'
 import { logAIRun } from '@/lib/ai/costTracker'
 import { getVisualPlanSystem, buildVisualPlanUser, getVisualPlanDirectSystem, buildVisualPlanDirectUser } from '@/lib/ai/prompts/visualPlan'
-import { deriveColorPalette, renderCarousel, renderStatic, renderStorySequence, renderCarouselDirect, renderStaticDirect, renderStorySequenceDirect } from '@/lib/visual-engine'
+import { deriveColorPalette, renderCarousel, renderStatic, renderStorySequence, renderCarouselDirect, renderStaticDirect, renderStorySequenceDirect, renderStaticStoryDirect } from '@/lib/visual-engine'
 import { adminClient } from '@/lib/supabase/admin'
 import type { PostVisual, CreativeBrief, FontPair, BrandLogos, DirectSlide } from '@/types'
 
@@ -450,8 +450,10 @@ export async function generateVisualDirectForPost(
     }
 
     const generatedHtml =
-      format === 'static' || format === 'static_story'
+      format === 'static'
         ? renderStaticDirect(renderParams)
+        : format === 'static_story'
+        ? renderStaticStoryDirect(renderParams)
         : format === 'story_sequence'
         ? renderStorySequenceDirect(renderParams)
         : renderCarouselDirect(renderParams)

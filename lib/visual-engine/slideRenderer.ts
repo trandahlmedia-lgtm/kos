@@ -526,6 +526,64 @@ body{background:#1a1a1a;display:flex;justify-content:center;padding:20px 0;font-
 // but uses DirectSlide.inner_html instead of the layout registry.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// renderStaticStoryDirect — 9:16 single-image story (420×747px) with story
+// chrome baked in (single filled progress bar + story header + logo).
+// No swipe JS or slide counter since it is a single static image.
+// ---------------------------------------------------------------------------
+
+export function renderStaticStoryDirect(params: {
+  slides: DirectSlide[]
+  palette: ColorPalette
+  fontPair: FontPair
+  clientName: string
+  caption: string
+  hashtags: string
+  instagramHandle?: string
+  logoUrls?: BrandLogos
+  websiteUrl?: string
+}): string {
+  const { slides, palette, fontPair, clientName, instagramHandle, logoUrls } = params
+  const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
+  const fontUrl = buildFontUrl(fontPair)
+
+  const slide = slides[0]
+  if (!slide) return ''
+
+  const isDark = slide.background !== 'light'
+  const bgValue = storySlideBackground(slide.background, palette)
+
+  // Single fully-filled progress bar (one segment, one image)
+  const progressBar = `<div style="position:absolute;top:12px;left:12px;right:12px;display:flex;gap:4px;z-index:20;"><div style="flex:1;height:2px;border-radius:2px;background:rgba(255,255,255,0.9);"></div></div>`
+
+  const slideHtml = `<div class="story-slide" style="background:${bgValue};">
+  ${progressBar}
+  ${storyHeader(handle, palette, isDark, logoUrls, fontPair)}
+  ${renderDirectLogo(slide.logo_placement, slide.background, logoUrls, 72)}
+  ${slide.inner_html}
+</div>`
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=420">
+<link href="${fontUrl}" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px 0;font-family:'${fontPair.body}',sans-serif;}
+.serif{font-family:'${fontPair.heading}',sans-serif;}
+.sans{font-family:'${fontPair.body}',sans-serif;}
+.phone-frame{width:420px;height:747px;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.08);position:relative;}
+.story-slide{width:420px;height:747px;position:relative;overflow:hidden;}
+</style>
+</head><body>
+<div class="phone-frame">
+  ${slideHtml}
+</div>
+</body></html>`
+}
+
 export function renderStorySequenceDirect(params: {
   slides: DirectSlide[]
   palette: ColorPalette

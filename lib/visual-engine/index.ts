@@ -3,5 +3,5 @@
 export { deriveColorPalette, buildBrandGradient, hexToRgbStr } from './colorDerivation'
 export { buildFontUrl, fontCssClasses } from './fontLoader'
 export { LAYOUT_REGISTRY, renderProgressBar, renderSwipeArrow } from './layoutRegistry'
-export { renderCarousel, renderStatic, renderStorySequence, renderCarouselDirect, renderStaticDirect, renderStorySequenceDirect } from './slideRenderer'
+export { renderCarousel, renderStatic, renderStorySequence, renderCarouselDirect, renderStaticDirect, renderStorySequenceDirect, renderStaticStoryDirect } from './slideRenderer'
 export { renderHeader, renderDots, renderActions, renderCaption } from './frameWrapper'

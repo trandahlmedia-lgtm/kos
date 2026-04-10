@@ -1,16 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Copy, Check, Sparkles } from 'lucide-react'
+import { Copy, Check, Sparkles, Eye, RefreshCw } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { PostStatusBadge } from '@/components/shared/StatusBadge'
 import { PlatformIcon } from '@/components/shared/PlatformIcon'
 import { CaptionEditor } from './CaptionEditor'
 import { CreativeUploader } from './CreativeUploader'
+import { VisualPreviewModal } from './VisualPreviewModal'
 import { updatePostStatusAction } from '@/lib/actions/posts'
+import { generateVisualAction } from '@/lib/actions/visuals'
 import { type Post, type PostStatus, type GeneratedCaptions } from '@/types'
+
+const PREVIEW_WIDTH = 280
+const NATIVE_WIDTH = 420
+const NATIVE_HEIGHT = 700
+const PREVIEW_SCALE = PREVIEW_WIDTH / NATIVE_WIDTH
+const PREVIEW_HEIGHT = Math.round(NATIVE_HEIGHT * PREVIEW_SCALE)
 
 const STATUS_OPTIONS: { value: PostStatus; label: string }[] = [
   { value: 'slot', label: 'Slot' },
@@ -42,6 +50,21 @@ export function SchedulePanel({
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [generatingCaption, setGeneratingCaption] = useState(false)
   const [captionGenError, setCaptionGenError] = useState('')
+  const [visualModalOpen, setVisualModalOpen] = useState(false)
+  const [regeneratingVisual, setRegeneratingVisual] = useState(false)
+  const [visualError, setVisualError] = useState('')
+
+  const generatedHtml = post?.visual?.generated_html ?? null
+  const iframeSrc = useMemo(() => {
+    if (!generatedHtml) return undefined
+    return URL.createObjectURL(new Blob([generatedHtml], { type: 'text/html' }))
+  }, [generatedHtml])
+
+  useEffect(() => {
+    return () => {
+      if (iframeSrc) URL.revokeObjectURL(iframeSrc)
+    }
+  }, [iframeSrc])
 
   if (!post) return null
 
@@ -69,6 +92,20 @@ export function SchedulePanel({
       setCaptionGenError('Network error. Please try again.')
     } finally {
       setGeneratingCaption(false)
+    }
+  }
+
+  async function handleRegenerateVisual() {
+    if (!post) return
+    setRegeneratingVisual(true)
+    setVisualError('')
+    try {
+      await generateVisualAction(post.id)
+      router.refresh()
+    } catch (err) {
+      setVisualError(err instanceof Error ? err.message : 'Regeneration failed.')
+    } finally {
+      setRegeneratingVisual(false)
     }
   }
 
@@ -137,11 +174,59 @@ export function SchedulePanel({
         <div className="px-5 py-4 space-y-5">
           {/* Creative */}
           <Section label="Creative">
-            <CreativeUploader
-              postId={post.id}
-              clientId={post.client_id}
-              existingThumbnailUrl={thumbnailUrl}
-            />
+            {iframeSrc ? (
+              <>
+                <div
+                  className="rounded-md border border-[#2a2a2a] overflow-hidden"
+                  style={{ width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT }}
+                >
+                  <iframe
+                    src={iframeSrc}
+                    title="Visual preview"
+                    sandbox="allow-scripts"
+                    style={{
+                      width: NATIVE_WIDTH,
+                      height: NATIVE_HEIGHT,
+                      transform: `scale(${PREVIEW_SCALE})`,
+                      transformOrigin: 'top left',
+                      border: 'none',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={() => setVisualModalOpen(true)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border border-[#E8732A] text-[#E8732A] hover:bg-[#E8732A]/10 transition-colors"
+                  >
+                    <Eye size={12} />
+                    View Full Preview
+                  </button>
+                  <button
+                    onClick={handleRegenerateVisual}
+                    disabled={regeneratingVisual}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border border-[#2a2a2a] text-[#555555] hover:text-white hover:border-[#555555] transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={regeneratingVisual ? 'animate-spin' : ''} />
+                    Regenerate
+                  </button>
+                </div>
+                {visualError && (
+                  <p className="text-[10px] text-red-400">{visualError}</p>
+                )}
+                <CreativeUploader
+                  postId={post.id}
+                  clientId={post.client_id}
+                  existingThumbnailUrl={thumbnailUrl}
+                />
+              </>
+            ) : (
+              <CreativeUploader
+                postId={post.id}
+                clientId={post.client_id}
+                existingThumbnailUrl={thumbnailUrl}
+              />
+            )}
           </Section>
 
           {/* Caption */}
@@ -265,6 +350,18 @@ export function SchedulePanel({
           </div>
         </div>
       </SheetContent>
+      <VisualPreviewModal
+        postId={post.id}
+        postMeta={{
+          clientName: clientName,
+          contentType: post.content_type,
+          format: post.format,
+          placement: post.placement,
+          angle: post.angle,
+        }}
+        isOpen={visualModalOpen}
+        onClose={() => setVisualModalOpen(false)}
+      />
     </Sheet>
   )
 }

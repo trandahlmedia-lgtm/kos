@@ -1,16 +1,17 @@
 import { buildBrandGradient } from './colorDerivation'
-import type { ColorPalette, FontPair, SlideContent } from '@/types'
+import type { ColorPalette, FontPair, SlideContent, BrandLogos } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type SlideRenderFn = (params: {
+export type SlideRenderFn = (params: {
   slide: SlideContent
   palette: ColorPalette
   fontPair: FontPair
   slideIndex: number
   totalSlides: number
+  logoUrls?: BrandLogos
 }) => string
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,49 @@ function renderGradientTag(label: string | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Logo rendering helpers
+// ---------------------------------------------------------------------------
+
+/** Pick the best logo URL for the given background */
+function pickLogoUrl(
+  placement: SlideContent['logo_placement'],
+  bg: SlideContent['background'],
+  logoUrls?: BrandLogos
+): string | undefined {
+  if (!placement || placement === 'none' || !logoUrls) return undefined
+
+  if (placement === 'icon') return logoUrls.icon
+  if (placement === 'wordmark') {
+    return isLightSlide(bg) ? (logoUrls.wordmark_dark ?? logoUrls.full) : (logoUrls.wordmark_light ?? logoUrls.full)
+  }
+  // "full" — prefer full, fall back to wordmark variant
+  if (logoUrls.full) return logoUrls.full
+  return isLightSlide(bg) ? logoUrls.wordmark_dark : logoUrls.wordmark_light
+}
+
+/** Render a full/wordmark logo centered above content */
+function renderLogo(
+  placement: SlideContent['logo_placement'],
+  bg: SlideContent['background'],
+  logoUrls: BrandLogos | undefined,
+  maxHeight: number,
+  maxWidth: number
+): string {
+  const url = pickLogoUrl(placement, bg, logoUrls)
+  if (!url) return ''
+  return `<div style="display:flex;justify-content:center;margin-bottom:18px;"><img src="${esc(url)}" style="max-height:${maxHeight}px;max-width:${maxWidth}px;object-fit:contain;" alt=""></div>`
+}
+
+/** Render an icon watermark (very low opacity, centered, behind content) */
+function renderIconWatermark(
+  placement: SlideContent['logo_placement'],
+  logoUrls: BrandLogos | undefined
+): string {
+  if (placement !== 'icon' || !logoUrls?.icon) return ''
+  return `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.05;z-index:0;pointer-events:none;"><img src="${esc(logoUrls.icon)}" style="max-height:200px;max-width:200px;object-fit:contain;" alt=""></div>`
+}
+
+// ---------------------------------------------------------------------------
 // Photo placeholder — matches reference exactly
 // ---------------------------------------------------------------------------
 
@@ -150,14 +194,16 @@ function renderPhotoSlot(
 // 1. hero_stat — big stat number + heading (reference carousel 1 slide 1)
 // ---------------------------------------------------------------------------
 
-const heroStat: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const heroStat: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const light = isLightSlide(slide.background)
   const heading = textColor(slide.background, palette)
   const statNum = slide.stat?.number ?? ''
   const statLabel = slide.stat?.label ?? ''
   const statColor = palette.brand_accent
 
-  const inner = `<div style="padding:36px 36px 52px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">
+  const inner = `<div style="padding:36px 36px 52px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
+    ${renderLogo(slide.logo_placement === 'full' ? 'full' : undefined, slide.background, logoUrls, 60, 200)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <div class="serif" style="font-size:80px;font-weight:900;color:${statColor};line-height:0.9;letter-spacing:-3px;">${esc(statNum)}</div>
     ${statLabel ? `<div class="sans" style="font-size:15px;color:${light ? '#aaaaaa' : 'rgba(255,255,255,0.35)'};text-decoration:line-through;margin:8px 0 20px;">${esc(statLabel)}</div>` : ''}
@@ -172,10 +218,12 @@ const heroStat: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =>
 // 2. hero_hook — bold headline with tag (reference carousel 2 slide 1)
 // ---------------------------------------------------------------------------
 
-const heroHook: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const heroHook: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const heading = textColor(slide.background, palette)
 
-  const inner = `<div style="padding:48px 36px 52px;display:flex;flex-direction:column;justify-content:flex-start;height:100%;">
+  const inner = `<div style="padding:48px 36px 52px;display:flex;flex-direction:column;justify-content:flex-start;height:100%;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
+    ${renderLogo(slide.logo_placement === 'full' ? 'full' : undefined, slide.background, logoUrls, 60, 200)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h1 class="serif" style="font-size:34px;font-weight:900;color:${heading};line-height:1.05;letter-spacing:-0.5px;">${esc(slide.heading)}</h1>
     ${slide.body ? `<div style="margin-top:auto;padding-bottom:20px;"><p class="sans" style="font-size:13px;color:${isLightSlide(slide.background) ? '#888' : 'rgba(255,255,255,0.4)'};">${formatText(slide.body)}</p></div>` : ''}
@@ -188,13 +236,14 @@ const heroHook: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =>
 // 3. problem_photo — photo top, text bottom (reference carousel 1 slide 2)
 // ---------------------------------------------------------------------------
 
-const problemPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const problemPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const light = isLightSlide(slide.background)
   const heading = textColor(slide.background, palette)
   const body = light ? '#666666' : 'rgba(255,255,255,0.6)'
   const slot = slide.photo_slots?.[0] ?? { slot_id: 'photo-0', label: 'Photo' }
 
-  const inner = `<div style="height:100%;display:flex;flex-direction:column;">
+  const inner = `<div style="height:100%;display:flex;flex-direction:column;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     <div style="flex:1;padding:24px 36px 0;display:flex;align-items:center;justify-content:center;">
       ${renderPhotoSlot(slot, '100%', '200px', slide.background)}
     </div>
@@ -212,11 +261,12 @@ const problemPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }
 // 4. pull_quote — centered italic quote with accent bars (reference carousel 1 slide 3)
 // ---------------------------------------------------------------------------
 
-const pullQuote: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const pullQuote: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const quoteText = slide.quote ?? slide.heading
   const barColor = palette.brand_accent
 
-  const inner = `<div style="padding:36px 44px 52px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">
+  const inner = `<div style="padding:36px 44px 52px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     <div style="width:40px;height:3px;background:${barColor};border-radius:2px;margin-bottom:28px;"></div>
     <p class="sans" style="font-size:20px;font-style:italic;color:#FFFFFF;line-height:1.45;font-weight:300;">&ldquo;${esc(quoteText)}&rdquo;</p>
     <div style="width:40px;height:3px;background:${barColor};border-radius:2px;margin-top:28px;"></div>
@@ -229,7 +279,7 @@ const pullQuote: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =
 // 5. feature_grid — 2×2 card grid (reference carousel 1 slide 4)
 // ---------------------------------------------------------------------------
 
-const featureGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const featureGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const light = isLightSlide(slide.background)
   const heading = textColor(slide.background, palette)
   const features = slide.features ?? []
@@ -248,7 +298,8 @@ const featureGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides })
       </div>`
   ).join('')
 
-  const inner = `<div style="padding:32px 28px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;">
+  const inner = `<div style="padding:32px 28px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h2 class="serif" style="font-size:22px;font-weight:800;color:${heading};line-height:1.1;margin-bottom:18px;">${esc(slide.heading)}</h2>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -263,7 +314,7 @@ const featureGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides })
 // 6. comparison_columns — side-by-side comparison cards (reference carousel 1 slide 5)
 // ---------------------------------------------------------------------------
 
-const comparisonColumns: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const comparisonColumns: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const left = slide.comparison?.left ?? { label: 'Before', items: [] }
   const right = slide.comparison?.right ?? { label: 'After', items: [] }
   const heading = textColor(slide.background, palette)
@@ -297,7 +348,8 @@ const comparisonColumns: SlideRenderFn = ({ slide, palette, slideIndex, totalSli
       <div style="display:flex;flex-direction:column;gap:8px;">${renderItems(right.items, rightItemColor)}</div>
     </div>`
 
-  const inner = `<div style="padding:32px 28px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;">
+  const inner = `<div style="padding:32px 28px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h2 class="serif" style="font-size:22px;font-weight:800;color:${heading};line-height:1.1;margin-bottom:24px;">${esc(slide.heading)}</h2>
     <div style="display:flex;gap:12px;margin-top:4px;">
@@ -312,7 +364,7 @@ const comparisonColumns: SlideRenderFn = ({ slide, palette, slideIndex, totalSli
 // 7. timeline_steps — vertical timeline with dots (reference carousel 3 slide 4)
 // ---------------------------------------------------------------------------
 
-const timelineSteps: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const timelineSteps: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const light = isLightSlide(slide.background)
   const heading = textColor(slide.background, palette)
   const stepTitleColor = light ? palette.dark_bg : '#FFFFFF'
@@ -331,7 +383,8 @@ const timelineSteps: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides 
       </div>`
   }).join('')
 
-  const inner = `<div style="padding:32px 36px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;">
+  const inner = `<div style="padding:32px 36px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h2 class="serif" style="font-size:22px;font-weight:800;color:${heading};line-height:1.1;margin-bottom:24px;">${esc(slide.heading)}</h2>
     <div style="position:relative;padding-left:28px;">
@@ -347,7 +400,7 @@ const timelineSteps: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides 
 // 8. icon_grid — icon boxes in a grid (reference carousel 2 slide 4 gradient)
 // ---------------------------------------------------------------------------
 
-const iconGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const iconGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const heading = textColor(slide.background, palette)
   const light = isLightSlide(slide.background)
   const features = slide.features ?? []
@@ -364,7 +417,8 @@ const iconGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =>
       </div>`
   ).join('')
 
-  const inner = `<div style="padding:36px 32px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;">
+  const inner = `<div style="padding:36px 32px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h2 class="serif" style="font-size:26px;font-weight:800;color:${heading};line-height:1.1;margin-bottom:28px;">${esc(slide.heading)}</h2>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px 12px;">
@@ -380,7 +434,7 @@ const iconGrid: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =>
 // 9. stat_blocks — horizontal stat cards (reference carousel 2 slide 3)
 // ---------------------------------------------------------------------------
 
-const statBlocks: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const statBlocks: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const heading = textColor(slide.background, palette)
   const light = isLightSlide(slide.background)
   const features = slide.features ?? []
@@ -401,7 +455,8 @@ const statBlocks: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) 
       </div>`
   ).join('')
 
-  const inner = `<div style="padding:36px 28px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;">
+  const inner = `<div style="padding:36px 28px 52px;display:flex;flex-direction:column;justify-content:center;height:100%;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h2 class="serif" style="font-size:22px;font-weight:800;color:${heading};line-height:1.1;margin-bottom:24px;">${esc(slide.heading)}</h2>
     <div style="display:flex;flex-direction:column;gap:12px;">
@@ -416,12 +471,13 @@ const statBlocks: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) 
 // 10. split_photo — side-by-side photo + text
 // ---------------------------------------------------------------------------
 
-const splitPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const splitPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const heading = textColor(slide.background, palette)
   const body = secondaryText(slide.background)
   const slot = slide.photo_slots?.[0] ?? { slot_id: 'photo-0', label: 'Photo' }
 
-  const inner = `<div style="display:flex;height:100%;padding-bottom:40px;">
+  const inner = `<div style="display:flex;height:100%;padding-bottom:40px;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:16px;">
       ${renderPhotoSlot(slot, '100%', '100%', slide.background)}
     </div>
@@ -439,10 +495,11 @@ const splitPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) 
 // 11. full_bleed_photo — full photo with text overlay
 // ---------------------------------------------------------------------------
 
-const fullBleedPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const fullBleedPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const slot = slide.photo_slots?.[0] ?? { slot_id: 'photo-0', label: 'Photo' }
 
   const inner = `<div style="position:relative;width:100%;height:100%;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
       ${renderPhotoSlot(slot, '100%', '100%', 'dark')}
     </div>
@@ -460,7 +517,7 @@ const fullBleedPhoto: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides
 // 12. card_stack — vertical list of feature cards
 // ---------------------------------------------------------------------------
 
-const cardStack: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const cardStack: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const heading = textColor(slide.background, palette)
   const light = isLightSlide(slide.background)
   const features = slide.features ?? []
@@ -480,7 +537,8 @@ const cardStack: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =
       </div>`
   ).join('')
 
-  const inner = `<div style="padding:32px 36px 52px;display:flex;flex-direction:column;height:100%;gap:12px;">
+  const inner = `<div style="padding:32px 36px 52px;display:flex;flex-direction:column;height:100%;gap:12px;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h2 class="serif" style="font-size:22px;font-weight:800;color:${heading};line-height:1.1;">${esc(slide.heading)}</h2>
     <div style="display:flex;flex-direction:column;gap:10px;flex:1;justify-content:center;">${cards}</div>
@@ -493,11 +551,12 @@ const cardStack: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =
 // 13. minimal_text — clean centered text
 // ---------------------------------------------------------------------------
 
-const minimalText: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const minimalText: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const heading = textColor(slide.background, palette)
   const body = secondaryText(slide.background)
 
-  const inner = `<div style="padding:36px 36px 52px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;gap:16px;">
+  const inner = `<div style="padding:36px 36px 52px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;gap:16px;position:relative;">
+    ${renderIconWatermark(slide.logo_placement, logoUrls)}
     ${slide.background === 'gradient' ? renderGradientTag(slide.tag_label) : renderTag(slide.tag_label, slide.background, palette)}
     <h2 class="serif" style="font-size:28px;font-weight:800;color:${heading};line-height:1.1;">${esc(slide.heading)}</h2>
     ${slide.body ? `<p class="sans" style="font-size:14px;font-weight:400;line-height:1.5;color:${body};max-width:300px;">${formatText(slide.body)}</p>` : ''}
@@ -510,7 +569,7 @@ const minimalText: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides })
 // 14. cta_final — gradient CTA slide with white button (reference final slides)
 // ---------------------------------------------------------------------------
 
-const ctaFinal: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) => {
+const ctaFinal: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides, logoUrls }) => {
   const light = isLightSlide(slide.background)
   const ctaText = slide.cta?.text ?? 'Get Started'
   const ctaSub = slide.cta?.subtitle ?? ''
@@ -520,6 +579,7 @@ const ctaFinal: SlideRenderFn = ({ slide, palette, slideIndex, totalSlides }) =>
   const btnColor = light ? '#FFFFFF' : palette.dark_bg
 
   const inner = `<div style="padding:36px 36px 52px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;text-align:center;">
+    ${renderLogo(slide.logo_placement === 'full' ? 'full' : undefined, slide.background, logoUrls, 80, 240)}
     <div class="serif" style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:rgba(255,255,255,0.5);margin-bottom:24px;">${esc(slide.heading).toUpperCase()}</div>
     ${slide.body ? `<h2 class="serif" style="font-size:24px;font-weight:800;color:#FFFFFF;line-height:1.15;margin-bottom:8px;">${formatText(slide.body)}</h2>` : ''}
     <div style="display:inline-flex;align-items:center;padding:14px 32px;background:${btnBg};color:${btnColor};font-family:inherit;font-weight:700;font-size:14px;border-radius:28px;margin-bottom:14px;" class="serif">${esc(ctaText)}</div>

@@ -29,11 +29,11 @@ export function renderCarousel(params: {
       if (!renderFn) {
         const fallback = LAYOUT_REGISTRY['minimal_text']
         if (fallback) {
-          return fallback({ slide, palette, fontPair, slideIndex: slide.index, totalSlides })
+          return fallback({ slide, palette, fontPair, slideIndex: slide.index, totalSlides, logoUrls })
         }
         return ''
       }
-      return renderFn({ slide, palette, fontPair, slideIndex: slide.index, totalSlides })
+      return renderFn({ slide, palette, fontPair, slideIndex: slide.index, totalSlides, logoUrls })
     })
     .join('')
 

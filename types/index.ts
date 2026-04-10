@@ -307,6 +307,7 @@ export interface SlideContent {
   comparison?: { left: { label: string; items: string[] }; right: { label: string; items: string[] } }
   photo_slots?: PhotoSlot[]
   cta?: { text: string; subtitle?: string }
+  logo_placement?: 'full' | 'icon' | 'wordmark' | 'none'
   has_arrow: boolean
 }
 

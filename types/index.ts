@@ -293,6 +293,15 @@ export interface FontPair {
   body: string
 }
 
+export interface DirectSlide {
+  index: number
+  inner_html: string
+  background: 'dark' | 'light' | 'gradient'
+  has_arrow: boolean
+  logo_placement: 'full' | 'icon' | 'wordmark' | 'none'
+  photo_slots: string[]
+}
+
 export interface SlideContent {
   index: number
   layout_type: string
@@ -332,6 +341,8 @@ export interface PostVisual {
   export_status: VisualExportStatus
   exported_at: string | null
   notes: string | null
+  slide_html?: DirectSlide[] | null
+  generation_mode?: 'template' | 'direct'
   created_at: string
   updated_at: string
 }

@@ -1,8 +1,8 @@
-import { LAYOUT_REGISTRY } from './layoutRegistry'
+import { LAYOUT_REGISTRY, renderProgressBar, renderSwipeArrow } from './layoutRegistry'
 import { buildFontUrl } from './fontLoader'
 import { buildBrandGradient } from './colorDerivation'
 import { renderHeader, renderDots, renderActions, renderCaption } from './frameWrapper'
-import type { CreativeBrief, ColorPalette, FontPair, BrandLogos } from '@/types'
+import type { CreativeBrief, ColorPalette, FontPair, BrandLogos, DirectSlide } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Story chrome helpers — used only by renderStorySequence
@@ -309,5 +309,296 @@ body{background:#1a1a1a;display:flex;justify-content:center;padding:20px 0;font-
   ${actionsHtml}
   ${captionHtml}
 </div>
+</body></html>`
+}
+
+// ---------------------------------------------------------------------------
+// Direct-mode helpers — shared by the three direct-mode render functions below
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the logo URL and dimensions for a direct-mode slide.
+ * Returns null if logo_placement is 'none' or no matching URL exists.
+ */
+function pickDirectLogoResult(
+  placement: DirectSlide['logo_placement'],
+  background: DirectSlide['background'],
+  logoUrls?: BrandLogos
+): { url: string; maxH: number; maxW: number } | null {
+  if (placement === 'none' || !logoUrls) return null
+
+  if (placement === 'icon') {
+    const url = logoUrls.icon
+    if (!url) return null
+    return { url, maxH: 32, maxW: 32 }
+  }
+
+  if (placement === 'wordmark') {
+    const url = background === 'light'
+      ? (logoUrls.wordmark_dark ?? logoUrls.full)
+      : (logoUrls.wordmark_light ?? logoUrls.full)
+    if (!url) return null
+    return { url, maxH: 48, maxW: 140 }
+  }
+
+  // 'full' — prefer the full lockup, fall back to background-appropriate wordmark
+  const url = logoUrls.full
+    ?? (background === 'light' ? logoUrls.wordmark_dark : logoUrls.wordmark_light)
+  if (!url) return null
+  return { url, maxH: 48, maxW: 140 }
+}
+
+/**
+ * Renders the logo as an absolutely-positioned element (top-right corner).
+ * topOffset controls vertical clearance — 16px for feed, 72px for stories (avoids chrome).
+ */
+function renderDirectLogo(
+  placement: DirectSlide['logo_placement'],
+  background: DirectSlide['background'],
+  logoUrls: BrandLogos | undefined,
+  topOffset = 16
+): string {
+  const result = pickDirectLogoResult(placement, background, logoUrls)
+  if (!result) return ''
+
+  const isLight = background === 'light'
+  const filter = isLight
+    ? 'drop-shadow(0 0 6px rgba(0,0,0,0.15))'
+    : 'drop-shadow(0 0 6px rgba(255,255,255,0.6)) drop-shadow(0 0 12px rgba(255,255,255,0.3))'
+
+  return `<img src="${escStory(result.url)}" style="position:absolute;top:${topOffset}px;right:16px;height:${result.maxH}px;max-width:${result.maxW}px;object-fit:contain;z-index:10;filter:${filter};" alt="">`
+}
+
+// ---------------------------------------------------------------------------
+// renderCarouselDirect — same document structure as renderCarousel but uses
+// DirectSlide.inner_html instead of the layout registry.
+// ---------------------------------------------------------------------------
+
+export function renderCarouselDirect(params: {
+  slides: DirectSlide[]
+  palette: ColorPalette
+  fontPair: FontPair
+  clientName: string
+  caption: string
+  hashtags: string
+  instagramHandle?: string
+  logoUrls?: BrandLogos
+  websiteUrl?: string
+}): string {
+  const { slides, palette, fontPair, clientName, caption, instagramHandle, logoUrls, websiteUrl } = params
+  const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
+  const totalSlides = slides.length
+  const fontUrl = buildFontUrl(fontPair)
+
+  const slidesHtml = slides.map((slide) => {
+    const bg = storySlideBackground(slide.background, palette)
+    const isLight = slide.background === 'light'
+    return `<div class="slide" style="background:${bg};">
+  ${slide.inner_html}
+  ${renderDirectLogo(slide.logo_placement, slide.background, logoUrls)}
+  ${slide.has_arrow ? renderSwipeArrow(isLight) : ''}
+  ${renderProgressBar(slide.index, totalSlides, isLight, palette)}
+</div>`
+  }).join('')
+
+  const avatarUrl = logoUrls?.icon ?? logoUrls?.full
+  const headerHtml = renderHeader(clientName, handle, undefined, avatarUrl)
+  const dotsHtml = renderDots(totalSlides)
+  const actionsHtml = renderActions()
+  const captionHtml = renderCaption(handle, caption, websiteUrl)
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=420">
+<link href="${fontUrl}" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a1a;display:flex;justify-content:center;padding:20px 0;font-family:'${fontPair.body}',sans-serif;}
+.serif{font-family:'${fontPair.heading}',sans-serif;}
+.sans{font-family:'${fontPair.body}',sans-serif;}
+.ig-frame{width:420px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3);}
+.ig-header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #eee;}
+.ig-handle{font-family:'${fontPair.heading}',sans-serif;font-size:13px;font-weight:700;color:#262626;}
+.ig-handle-sub{font-size:11px;color:#8e8e8e;font-weight:400;}
+.carousel-viewport{width:420px;aspect-ratio:4/5;overflow:hidden;position:relative;cursor:grab;}
+.carousel-track{display:flex;transition:transform 0.35s cubic-bezier(.4,0,.2,1);height:100%;}
+.slide{min-width:420px;width:420px;height:525px;position:relative;display:flex;flex-direction:column;overflow:hidden;}
+.ig-dots{display:flex;justify-content:center;gap:4px;padding:10px 0 6px;}
+.ig-dot{width:6px;height:6px;border-radius:50%;background:#d4d4d4;transition:background 0.2s;}
+.ig-dot.active{background:#0095f6;}
+.ig-actions{display:flex;align-items:center;padding:8px 14px 4px;gap:16px;}
+.ig-bookmark{margin-left:auto;}
+.ig-caption{padding:6px 14px 14px;font-size:13px;color:#262626;line-height:1.4;}
+.ig-caption strong{font-weight:600;}
+.ig-caption .time{display:block;margin-top:6px;font-size:10px;color:#8e8e8e;letter-spacing:0.5px;}
+</style>
+</head><body>
+<div class="ig-frame">
+  ${headerHtml}
+  <div class="carousel-viewport" id="viewport">
+    <div class="carousel-track" id="track">${slidesHtml}</div>
+  </div>
+  ${dotsHtml}
+  ${actionsHtml}
+  ${captionHtml}
+</div>
+<script>
+const track=document.getElementById('track'),viewport=document.getElementById('viewport'),dots=document.querySelectorAll('.ig-dot');
+let current=0,startX=0,dx=0,dragging=false;const total=${totalSlides},W=420;
+function goTo(i){current=Math.max(0,Math.min(total-1,i));track.style.transform='translateX('+(-current*W)+'px)';dots.forEach((d,j)=>d.classList.toggle('active',j===current));}
+viewport.addEventListener('pointerdown',e=>{dragging=true;startX=e.clientX;dx=0;track.style.transition='none';viewport.setPointerCapture(e.pointerId);});
+viewport.addEventListener('pointermove',e=>{if(!dragging)return;dx=e.clientX-startX;track.style.transform='translateX('+(-current*W+dx)+'px)';});
+viewport.addEventListener('pointerup',()=>{dragging=false;track.style.transition='transform 0.35s cubic-bezier(.4,0,.2,1)';if(dx<-40)goTo(current+1);else if(dx>40)goTo(current-1);else goTo(current);});
+</script></body></html>`
+}
+
+// ---------------------------------------------------------------------------
+// renderStaticDirect — same document structure as renderStatic but uses
+// DirectSlide.inner_html instead of the layout registry.
+// ---------------------------------------------------------------------------
+
+export function renderStaticDirect(params: {
+  slides: DirectSlide[]
+  palette: ColorPalette
+  fontPair: FontPair
+  clientName: string
+  caption: string
+  hashtags: string
+  instagramHandle?: string
+  logoUrls?: BrandLogos
+  websiteUrl?: string
+}): string {
+  const { slides, palette, fontPair, clientName, caption, instagramHandle, logoUrls, websiteUrl } = params
+  const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
+  const fontUrl = buildFontUrl(fontPair)
+
+  const slide = slides[0]
+  if (!slide) return ''
+
+  const bg = storySlideBackground(slide.background, palette)
+  const slideHtml = `<div class="slide" style="background:${bg};">
+  ${slide.inner_html}
+  ${renderDirectLogo(slide.logo_placement, slide.background, logoUrls)}
+</div>`
+
+  const avatarUrl = logoUrls?.icon ?? logoUrls?.full
+  const headerHtml = renderHeader(clientName, handle, undefined, avatarUrl)
+  const actionsHtml = renderActions()
+  const captionHtml = renderCaption(handle, caption, websiteUrl)
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=420">
+<link href="${fontUrl}" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a1a;display:flex;justify-content:center;padding:20px 0;font-family:'${fontPair.body}',sans-serif;}
+.serif{font-family:'${fontPair.heading}',sans-serif;}
+.sans{font-family:'${fontPair.body}',sans-serif;}
+.ig-frame{width:420px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3);}
+.ig-header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #eee;}
+.ig-handle{font-family:'${fontPair.heading}',sans-serif;font-size:13px;font-weight:700;color:#262626;}
+.ig-handle-sub{font-size:11px;color:#8e8e8e;font-weight:400;}
+.static-viewport{width:420px;height:525px;overflow:hidden;position:relative;}
+.slide{min-width:420px;width:420px;height:525px;position:relative;display:flex;flex-direction:column;overflow:hidden;}
+.ig-actions{display:flex;align-items:center;padding:8px 14px 4px;gap:16px;}
+.ig-bookmark{margin-left:auto;}
+.ig-caption{padding:6px 14px 14px;font-size:13px;color:#262626;line-height:1.4;}
+.ig-caption strong{font-weight:600;}
+.ig-caption .time{display:block;margin-top:6px;font-size:10px;color:#8e8e8e;letter-spacing:0.5px;}
+</style>
+</head><body>
+<div class="ig-frame">
+  ${headerHtml}
+  <div class="static-viewport">${slideHtml}</div>
+  ${actionsHtml}
+  ${captionHtml}
+</div>
+</body></html>`
+}
+
+// ---------------------------------------------------------------------------
+// renderStorySequenceDirect — same document structure as renderStorySequence
+// but uses DirectSlide.inner_html instead of the layout registry.
+// ---------------------------------------------------------------------------
+
+export function renderStorySequenceDirect(params: {
+  slides: DirectSlide[]
+  palette: ColorPalette
+  fontPair: FontPair
+  clientName: string
+  caption: string
+  hashtags: string
+  instagramHandle?: string
+  logoUrls?: BrandLogos
+  websiteUrl?: string
+}): string {
+  const { slides, palette, fontPair, clientName, instagramHandle, logoUrls } = params
+  const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
+  const totalSlides = slides.length
+  const fontUrl = buildFontUrl(fontPair)
+
+  const slidesHtml = slides.map((slide) => {
+    const isDark = slide.background !== 'light'
+    const bgValue = storySlideBackground(slide.background, palette)
+    return `<div class="story-slide" style="background:${bgValue};">
+  ${storyProgressBars(slide.index, totalSlides)}
+  ${storyHeader(handle, palette, isDark, logoUrls, fontPair)}
+  ${slide.has_arrow ? storyTapArrow(isDark) : ''}
+  ${renderDirectLogo(slide.logo_placement, slide.background, logoUrls, 72)}
+  ${slide.inner_html}
+</div>`
+  }).join('')
+
+  const dotsHtml = Array.from({ length: totalSlides }, (_, i) =>
+    `<div class="dot${i === 0 ? ' active' : ''}" onclick="goToSlide(${i})"></div>`
+  ).join('')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=420">
+<link href="${fontUrl}" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px 0;font-family:'${fontPair.body}',sans-serif;}
+.serif{font-family:'${fontPair.heading}',sans-serif;}
+.sans{font-family:'${fontPair.body}',sans-serif;}
+.phone-frame{width:420px;height:747px;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.08);position:relative;}
+.story-viewport{width:420px;height:747px;overflow:hidden;position:relative;cursor:grab;}
+.story-viewport:active{cursor:grabbing;}
+.story-track{display:flex;height:100%;transition:transform 0.35s cubic-bezier(.4,0,.2,1);}
+.story-slide{width:420px;min-width:420px;height:747px;position:relative;overflow:hidden;}
+.preview-dots{display:flex;gap:8px;justify-content:center;margin-top:18px;}
+.preview-dots .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);transition:background 0.3s,transform 0.3s;cursor:pointer;}
+.preview-dots .dot.active{background:${palette.brand_accent};transform:scale(1.3);}
+.slide-counter{color:rgba(255,255,255,0.4);font-family:'${fontPair.heading}',sans-serif;font-size:12px;margin-top:12px;letter-spacing:1px;text-align:center;}
+</style>
+</head><body>
+<div class="phone-frame">
+  <div class="story-viewport" id="viewport">
+    <div class="story-track" id="track">${slidesHtml}</div>
+  </div>
+</div>
+<div class="preview-dots">${dotsHtml}</div>
+<div class="slide-counter" id="counter">1 / ${totalSlides}</div>
+<script>
+var startX=0,currentX=0,isDragging=false,currentSlide=0;
+var track=document.getElementById('track');
+var viewport=document.getElementById('viewport');
+var totalSlides=${totalSlides};
+var slideWidth=420;
+function goToSlide(idx){currentSlide=Math.max(0,Math.min(idx,totalSlides-1));track.style.transition='transform 0.35s cubic-bezier(.4,0,.2,1)';track.style.transform='translateX('+(-currentSlide*slideWidth)+'px)';updateDots();}
+function updateDots(){document.querySelectorAll('.dot').forEach(function(d,i){d.classList.toggle('active',i===currentSlide);});document.getElementById('counter').textContent=(currentSlide+1)+' / '+totalSlides;}
+viewport.addEventListener('pointerdown',function(e){isDragging=true;startX=e.clientX;track.style.transition='none';viewport.setPointerCapture(e.pointerId);});
+viewport.addEventListener('pointermove',function(e){if(!isDragging)return;currentX=e.clientX-startX;track.style.transform='translateX('+(-currentSlide*slideWidth+currentX)+'px)';});
+viewport.addEventListener('pointerup',function(){if(!isDragging)return;isDragging=false;var threshold=slideWidth*0.2;if(currentX<-threshold&&currentSlide<totalSlides-1){goToSlide(currentSlide+1);}else if(currentX>threshold&&currentSlide>0){goToSlide(currentSlide-1);}else{goToSlide(currentSlide);}currentX=0;});
+document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')goToSlide(currentSlide+1);if(e.key==='ArrowLeft')goToSlide(currentSlide-1);});
+</script>
 </body></html>`
 }

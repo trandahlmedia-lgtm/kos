@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit, userAction, LIMITS } from '@/lib/security/rateLimit'
-import { generateVisualForPost } from '@/lib/ai/generateVisuals'
+import { generateVisualForPost, generateVisualDirectForPost } from '@/lib/ai/generateVisuals'
 
 const requestSchema = z.object({
   postId: z.string().uuid(),
   notes: z.string().max(1000).optional(),
+  mode: z.enum(['direct', 'template']).optional().default('direct'),
 })
 
 export async function POST(request: Request) {
@@ -44,12 +45,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const visual = await generateVisualForPost(
-      supabase,
-      parsed.data.postId,
-      user.id,
-      parsed.data.notes
-    )
+    const visual = parsed.data.mode === 'template'
+      ? await generateVisualForPost(supabase, parsed.data.postId, user.id, parsed.data.notes)
+      : await generateVisualDirectForPost(supabase, parsed.data.postId, user.id, parsed.data.notes)
 
     return NextResponse.json(visual)
   } catch (err) {

@@ -161,6 +161,7 @@ export async function POST(request: Request) {
       mediaId: media.id,
       originalUrl: urlMap[storagePath] ?? null,
       thumbnailUrl: thumbnailPath ? (urlMap[thumbnailPath] ?? null) : null,
+      ...(category === 'brand_asset' && { storagePath }),
     })
   } catch (err) {
     console.error('[media/upload] unexpected error:', err)

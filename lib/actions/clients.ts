@@ -15,6 +15,8 @@ import {
   updateBrandAssetsSchema,
   formatZodErrors,
 } from '@/lib/security/validation'
+import { adminClient } from '@/lib/supabase/admin'
+import type { BrandLogos } from '@/types'
 import {
   checkRateLimit,
   userAction,
@@ -243,7 +245,7 @@ export async function updateClientAction(
 // ---------------------------------------------------------------------------
 
 /**
- * Update a client's brand asset fields (logo_url, instagram_handle).
+ * Update a client's brand asset fields (brand_logos, instagram_handle).
  *
  * Security:
  *   1. Auth re-verification
@@ -253,7 +255,7 @@ export async function updateClientAction(
  */
 export async function updateClientBrandAssets(
   clientId: string,
-  input: { logo_url?: string; instagram_handle?: string }
+  input: { brand_logos?: BrandLogos | null; instagram_handle?: string }
 ): Promise<void> {
   const supabase = await createClient()
   const {
@@ -281,7 +283,7 @@ export async function updateClientBrandAssets(
   const { error } = await supabase
     .from('clients')
     .update({
-      ...(clean.logo_url !== undefined && { logo_url: clean.logo_url ?? null }),
+      ...(clean.brand_logos !== undefined && { brand_logos: clean.brand_logos ?? null }),
       ...(clean.instagram_handle !== undefined && { instagram_handle: clean.instagram_handle ?? null }),
       updated_at: new Date().toISOString(),
     })
@@ -293,4 +295,55 @@ export async function updateClientBrandAssets(
   }
 
   revalidatePath(`/clients/${validId}`)
+}
+
+// ---------------------------------------------------------------------------
+// getSignedLogoUrls
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate fresh signed URLs for a client's brand logos.
+ * Reads brand_logos (storage paths) and returns signed URLs (1-hour expiry).
+ */
+export async function getSignedLogoUrls(
+  clientId: string
+): Promise<BrandLogos> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const idResult = z.string().uuid('Invalid client ID').safeParse(clientId)
+  if (!idResult.success) throw new Error('Invalid client ID')
+
+  const { data: client, error } = await supabase
+    .from('clients')
+    .select('brand_logos')
+    .eq('id', idResult.data)
+    .single()
+
+  if (error || !client) {
+    throw new Error('Client not found')
+  }
+
+  const logos = client.brand_logos as BrandLogos | null
+  if (!logos) return {}
+
+  const result: BrandLogos = {}
+  const keys = ['icon', 'wordmark_dark', 'wordmark_light', 'full'] as const
+
+  for (const key of keys) {
+    const path = logos[key]
+    if (path) {
+      const { data: signedData } = await adminClient.storage
+        .from('kos-media')
+        .createSignedUrl(path, 3600)
+      if (signedData?.signedUrl) {
+        result[key] = signedData.signedUrl
+      }
+    }
+  }
+
+  return result
 }

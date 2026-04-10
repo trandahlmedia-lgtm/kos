@@ -1,7 +1,7 @@
 import { LAYOUT_REGISTRY } from './layoutRegistry'
 import { buildFontUrl } from './fontLoader'
 import { renderHeader, renderDots, renderActions, renderCaption } from './frameWrapper'
-import type { CreativeBrief, ColorPalette, FontPair } from '@/types'
+import type { CreativeBrief, ColorPalette, FontPair, BrandLogos } from '@/types'
 
 // ---------------------------------------------------------------------------
 // renderCarousel — produces a complete, self-contained HTML document
@@ -14,10 +14,10 @@ export function renderCarousel(params: {
   fontPair: FontPair
   clientName: string
   instagramHandle?: string
-  logoUrl?: string
+  logoUrls?: BrandLogos
   websiteUrl?: string
 }): string {
-  const { brief, palette, fontPair, clientName, instagramHandle, logoUrl, websiteUrl } = params
+  const { brief, palette, fontPair, clientName, instagramHandle, logoUrls, websiteUrl } = params
   const handle = instagramHandle ?? clientName.toLowerCase().replace(/\s+/g, '')
   const totalSlides = brief.slides.length
   const fontUrl = buildFontUrl(fontPair)
@@ -37,7 +37,9 @@ export function renderCarousel(params: {
     })
     .join('')
 
-  const headerHtml = renderHeader(clientName, handle, undefined, logoUrl)
+  // Use icon for IG header avatar, fall back to full logo
+  const avatarUrl = logoUrls?.icon ?? logoUrls?.full
+  const headerHtml = renderHeader(clientName, handle, undefined, avatarUrl)
   const dotsHtml = renderDots(totalSlides)
   const actionsHtml = renderActions()
   const captionHtml = renderCaption(handle, brief.caption, websiteUrl)

@@ -30,6 +30,13 @@ export interface Profile {
   created_at: string
 }
 
+export interface BrandLogos {
+  icon?: string
+  wordmark_dark?: string
+  wordmark_light?: string
+  full?: string
+}
+
 export interface Client {
   id: string
   name: string
@@ -48,7 +55,7 @@ export interface Client {
   ads_eligible_at?: string
   client_since_days?: number
   last_post_at?: string
-  logo_url?: string
+  brand_logos: BrandLogos | null
   instagram_handle?: string
   notes?: string
   created_by?: string

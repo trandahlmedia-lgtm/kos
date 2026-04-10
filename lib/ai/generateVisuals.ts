@@ -5,7 +5,7 @@ import { logAIRun } from '@/lib/ai/costTracker'
 import { VISUAL_PLAN_SYSTEM, buildVisualPlanUser } from '@/lib/ai/prompts/visualPlan'
 import { deriveColorPalette, renderCarousel } from '@/lib/visual-engine'
 import { adminClient } from '@/lib/supabase/admin'
-import type { PostVisual, CreativeBrief, FontPair } from '@/types'
+import type { PostVisual, CreativeBrief, FontPair, BrandLogos } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Helpers — extract brand color and font pair from claude_md
@@ -97,7 +97,7 @@ export async function generateVisualForPost(
   // 1. Fetch post + client data
   const { data: post, error: postError } = await supabase
     .from('posts')
-    .select('id, client_id, platform, content_type, format, placement, angle, ai_reasoning, clients(name, claude_md, platforms, logo_url, instagram_handle, website)')
+    .select('id, client_id, platform, content_type, format, placement, angle, ai_reasoning, clients(name, claude_md, platforms, brand_logos, instagram_handle, website)')
     .eq('id', postId)
     .single()
 
@@ -108,7 +108,7 @@ export async function generateVisualForPost(
   const clientData = Array.isArray(post.clients) ? post.clients[0] : post.clients
   const claudeMd = (clientData as { claude_md?: string } | null)?.claude_md ?? ''
   const clientName = (clientData as { name?: string } | null)?.name ?? 'Client'
-  const logoPath = (clientData as { logo_url?: string } | null)?.logo_url ?? undefined
+  const brandLogos = (clientData as { brand_logos?: BrandLogos | null } | null)?.brand_logos ?? null
   const instagramHandle = (clientData as { instagram_handle?: string } | null)?.instagram_handle ?? undefined
   const websiteUrl = (clientData as { website?: string } | null)?.website ?? undefined
 
@@ -178,13 +178,21 @@ export async function generateVisualForPost(
       throw new Error('AI returned an empty visual brief. Please try again.')
     }
 
-    // 8. Generate signed logo URL if a logo is on file
-    let logoUrl: string | undefined
-    if (logoPath) {
-      const { data: signedData } = await adminClient.storage
-        .from('kos-media')
-        .createSignedUrl(logoPath, 3600) // 1 hour expiry
-      logoUrl = signedData?.signedUrl
+    // 8. Generate signed logo URLs for whichever variants exist
+    const logoUrls: BrandLogos = {}
+    if (brandLogos) {
+      const keys = ['icon', 'wordmark_dark', 'wordmark_light', 'full'] as const
+      for (const key of keys) {
+        const path = brandLogos[key]
+        if (path) {
+          const { data: signedData } = await adminClient.storage
+            .from('kos-media')
+            .createSignedUrl(path, 3600)
+          if (signedData?.signedUrl) {
+            logoUrls[key] = signedData.signedUrl
+          }
+        }
+      }
     }
 
     // 9. Render HTML carousel
@@ -194,7 +202,7 @@ export async function generateVisualForPost(
       fontPair,
       clientName,
       instagramHandle,
-      logoUrl,
+      logoUrls,
       websiteUrl,
     })
 

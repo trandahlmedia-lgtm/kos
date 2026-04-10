@@ -169,10 +169,18 @@ export const saveClaudeMdSchema = z.object({
     .max(100_000, 'Brand document exceeds the 100 KB limit. Please shorten it.'),
 })
 
-/** Updating client brand assets (logo + IG handle). */
+/** Brand logos JSONB shape — each value is a Supabase storage path. */
+export const brandLogosSchema = z.object({
+  icon: z.string().max(500, 'Storage path too long').optional(),
+  wordmark_dark: z.string().max(500, 'Storage path too long').optional(),
+  wordmark_light: z.string().max(500, 'Storage path too long').optional(),
+  full: z.string().max(500, 'Storage path too long').optional(),
+}).nullable().optional()
+
+/** Updating client brand assets (logos + IG handle). */
 export const updateBrandAssetsSchema = z.object({
   clientId: z.string().uuid('Invalid client ID'),
-  logo_url: z.string().max(1000, 'Logo URL too long').optional().or(z.literal('').transform(() => undefined)),
+  brand_logos: brandLogosSchema,
   instagram_handle: z
     .string()
     .max(30, 'Instagram handle must be 30 characters or fewer')

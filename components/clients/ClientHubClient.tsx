@@ -138,7 +138,7 @@ export function ClientHubClient({
         <TabsContent value="brand-kit">
           <BrandAssetsPanel
             clientId={client.id}
-            logoUrl={client.logo_url ?? null}
+            brandLogos={client.brand_logos ?? null}
             instagramHandle={client.instagram_handle ?? null}
           />
         </TabsContent>

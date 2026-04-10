@@ -37,16 +37,18 @@ interface PostCardProps {
   onPreviewVisual?: (postId: string) => void
 }
 
-const FORMAT_LABELS: Record<string, string> = {
+const FORMAT_LAYOUT_LABELS: Record<string, string> = {
   carousel: 'Carousel',
-  static_feed: 'Static Post',
-  story_sequence: 'Story Sequence',
-  static_story: 'Static Story',
+  static: 'Static',
+  story_sequence: 'Carousel',
+  static_story: 'Static',
 }
 
-const PLACEMENT_LABELS: Record<string, string> = {
-  feed: 'Feed',
-  story: 'Story',
+const FORMAT_PLACEMENT_LABELS: Record<string, string> = {
+  carousel: 'Feed',
+  static: 'Feed',
+  story_sequence: 'Story',
+  static_story: 'Story',
 }
 
 export function PostCard({
@@ -102,14 +104,14 @@ export function PostCard({
             </span>
           )}
           {post.format && (
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-medium text-[#999999] bg-[#1a1a1a] border border-[#2a2a2a]">
-              {FORMAT_LABELS[post.format] ?? post.format}
-            </span>
-          )}
-          {post.placement && (
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-medium text-[#999999] bg-[#1a1a1a] border border-[#2a2a2a]">
-              {PLACEMENT_LABELS[post.placement] ?? post.placement}
-            </span>
+            <>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium text-[#999999] bg-[#1a1a1a] border border-[#2a2a2a]">
+                {FORMAT_LAYOUT_LABELS[post.format] ?? post.format}
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium text-[#999999] bg-[#1a1a1a] border border-[#2a2a2a]">
+                {FORMAT_PLACEMENT_LABELS[post.format] ?? post.format}
+              </span>
+            </>
           )}
         </div>
         <div className="flex items-center gap-2">

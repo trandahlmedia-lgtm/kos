@@ -18,12 +18,14 @@ const postStatusEnum = z.enum([
   'slot', 'in_production', 'ready', 'scheduled', 'published',
 ])
 const postFormatEnum = z.enum(['carousel', 'static', 'story_sequence', 'static_story'])
+const placementEnum = z.enum(['feed', 'story'])
 
 const createPostSchema = z.object({
   client_id: z.string().uuid('Invalid client ID'),
   platform: platformEnum,
   content_type: contentTypeEnum.optional(),
   format: postFormatEnum.default('carousel'),
+  placement: placementEnum.default('feed'),
   status: postStatusEnum.default('slot'),
   caption: z.string().max(5000).optional(),
   cta: z.string().max(200).trim().optional().or(z.literal('').transform(() => undefined)),
@@ -54,6 +56,7 @@ export async function createPostAction(input: {
   platform: Platform
   content_type?: ContentType
   format?: PostFormat
+  placement?: 'feed' | 'story'
   caption?: string
   cta?: string
   phone?: string
@@ -78,6 +81,7 @@ export async function createPostAction(input: {
       platform: clean.platform,
       content_type: clean.content_type ?? null,
       format: clean.format,
+      placement: clean.placement,
       status: clean.status,
       caption: clean.caption ?? null,
       cta: clean.cta ?? null,
@@ -110,6 +114,7 @@ export async function updatePostAction(
     platform: Platform
     content_type: ContentType
     format: PostFormat
+    placement: 'feed' | 'story'
     caption: string
     cta: string
     phone: string

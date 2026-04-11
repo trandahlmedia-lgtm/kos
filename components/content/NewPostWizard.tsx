@@ -162,6 +162,19 @@ export function NewPostWizard({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [finishing, setFinishing] = useState(false)
 
+  // NOTE: All hooks must be called before any conditional return (Rules of Hooks)
+  const handlePostCreated = useCallback((id: string) => {
+    setWizardData((prev) => ({ ...prev, postId: id }))
+  }, [])
+
+  const handleVisualReady = useCallback((id: string) => {
+    setWizardData((prev) => ({ ...prev, visualId: id }))
+  }, [])
+
+  const handleCaptionReady = useCallback((caption: string) => {
+    setWizardData((prev) => ({ ...prev, caption }))
+  }, [])
+
   if (!open) return null
 
   const totalSteps = STEPS.length
@@ -250,18 +263,6 @@ export function NewPostWizard({
     resetWizard()
     onClose()
   }
-
-  const handlePostCreated = useCallback((id: string) => {
-    setWizardData((prev) => ({ ...prev, postId: id }))
-  }, [])
-
-  const handleVisualReady = useCallback((id: string) => {
-    setWizardData((prev) => ({ ...prev, visualId: id }))
-  }, [])
-
-  const handleCaptionReady = useCallback((caption: string) => {
-    setWizardData((prev) => ({ ...prev, caption }))
-  }, [])
 
   function handleClientSelect(clientId: string, clientName: string) {
     setWizardData((prev) => ({ ...prev, clientId, clientName }))

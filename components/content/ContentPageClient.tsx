@@ -8,6 +8,7 @@ import { WhatNextQueue } from './WhatNextQueue'
 import { WeeklyCalendar, DayView } from './WeeklyCalendar'
 import { SchedulePanel } from './SchedulePanel'
 import { PostDialog } from './PostDialog'
+import { NewPostWizard } from './NewPostWizard'
 import { VisualPreviewModal } from './VisualPreviewModal'
 import { type Post, type Client } from '@/types'
 
@@ -42,6 +43,8 @@ export function ContentPageClient({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [postDialogOpen, setPostDialogOpen] = useState(false)
   const [newPostDefaults, setNewPostDefaults] = useState<{ clientId?: string; date?: string }>({})
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardDefaults, setWizardDefaults] = useState<{ clientId?: string; date?: string }>({})
 
   // Visual preview modal state
   const [visualPreviewPostId, setVisualPreviewPostId] = useState<string | null>(null)
@@ -87,6 +90,11 @@ export function ContentPageClient({
   }
 
   function openNewPost(clientId?: string, date?: string) {
+    setWizardDefaults({ clientId, date })
+    setWizardOpen(true)
+  }
+
+  function openEditPost(clientId?: string, date?: string) {
     setNewPostDefaults({ clientId, date })
     setPostDialogOpen(true)
   }
@@ -319,7 +327,17 @@ export function ContentPageClient({
         onClose={() => setSelectedPostId(null)}
       />
 
-      {/* New/Edit post dialog */}
+      {/* New post wizard */}
+      <NewPostWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        clients={clients}
+        posts={posts}
+        initialClientId={wizardDefaults.clientId}
+        initialDate={wizardDefaults.date}
+      />
+
+      {/* Edit post dialog (existing posts only) */}
       <PostDialog
         open={postDialogOpen}
         onOpenChange={setPostDialogOpen}

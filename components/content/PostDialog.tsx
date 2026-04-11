@@ -125,6 +125,7 @@ export function PostDialog({
         })
       }
 
+      setLoading(false)
       onOpenChange(false)
       router.refresh()
     } catch (err) {

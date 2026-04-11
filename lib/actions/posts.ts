@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { adminClient } from '@/lib/supabase/admin'
 import { type Platform, type ContentType, type PostStatus, type PostFormat } from '@/types'
 
 // ---------------------------------------------------------------------------
@@ -174,13 +175,25 @@ export async function updatePostStatusAction(
   postId: string,
   status: PostStatus
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase, user } = await requireAuth()
 
   const idResult = z.string().uuid().safeParse(postId)
   if (!idResult.success) throw new Error('Invalid post ID')
 
   const statusResult = postStatusEnum.safeParse(status)
   if (!statusResult.success) throw new Error('Invalid status')
+
+  // Verify ownership via the user-authenticated client before bypassing RLS.
+  // The RLS WITH CHECK on posts may block certain status transitions (e.g. slot → ready),
+  // so we use adminClient for the write after explicit ownership confirmation.
+  const { data: post, error: fetchError } = await supabase
+    .from('posts')
+    .select('id, created_by')
+    .eq('id', idResult.data)
+    .single()
+
+  if (fetchError || !post) throw new Error('Post not found')
+  if (post.created_by !== user.id) throw new Error('Unauthorized')
 
   const now = new Date().toISOString()
   const timestampField = STATUS_TIMESTAMPS[statusResult.data]
@@ -190,10 +203,13 @@ export async function updatePostStatusAction(
   }
   if (timestampField) updatePayload[timestampField] = now
 
-  const { error } = await supabase
+  // Use adminClient to write — ownership already verified above.
+  // Belt-and-suspenders: also filter by created_by to prevent any race condition.
+  const { error } = await adminClient
     .from('posts')
     .update(updatePayload)
     .eq('id', idResult.data)
+    .eq('created_by', user.id)
 
   if (error) {
     console.error('[updatePostStatusAction] update failed:', error)

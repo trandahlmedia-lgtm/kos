@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { type Platform, type ContentType, type PostFormat } from '@/types'
+import { type Platform, type ContentType, type PostFormat, type PostPlacement } from '@/types'
 
 interface StepCaptionProps {
   postId: string
@@ -12,12 +12,17 @@ interface StepCaptionProps {
   contentType: ContentType
   angle: string
   format: PostFormat
+  placement?: PostPlacement
   onCaptionReady: (caption: string) => void
 }
 
 export function StepCaption({
   postId,
   clientId,
+  platform,
+  contentType,
+  angle,
+  format,
   onCaptionReady,
 }: StepCaptionProps) {
   const [caption, setCaption] = useState('')
@@ -25,18 +30,26 @@ export function StepCaption({
   const [hashtags, setHashtags] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [specificContext, setSpecificContext] = useState('')
   const [tweakInstruction, setTweakInstruction] = useState('')
   const [tweaking, setTweaking] = useState(false)
   const [tweakError, setTweakError] = useState('')
 
-  const generateCaption = useCallback(async () => {
+  const generateCaption = useCallback(async (contextOverride?: string) => {
     setLoading(true)
     setError('')
     try {
       const res = await fetch('/api/ai/captions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId }),
+        body: JSON.stringify({
+          postId,
+          angle,
+          contentType,
+          format,
+          platform,
+          specificContext: contextOverride ?? specificContext,
+        }),
       })
       const data = await res.json() as {
         best?: { content: string; cta: string; hashtags: string }
@@ -56,7 +69,7 @@ export function StepCaption({
     } finally {
       setLoading(false)
     }
-  }, [postId, onCaptionReady])
+  }, [postId, angle, contentType, format, platform, specificContext, onCaptionReady])
 
   // Auto-generate on mount
   useEffect(() => {
@@ -99,7 +112,7 @@ export function StepCaption({
     setCta('')
     setHashtags('')
     onCaptionReady('')
-    generateCaption()
+    void generateCaption()
   }
 
   if (loading) {
@@ -116,7 +129,7 @@ export function StepCaption({
       <div className="flex flex-col items-center gap-4 py-16">
         <p className="text-red-400 text-sm">{error}</p>
         <Button
-          onClick={generateCaption}
+          onClick={() => void generateCaption()}
           className="bg-[#1a1a1a] hover:bg-[#222222] text-white border border-[#2a2a2a] text-sm h-9"
         >
           Try Again
@@ -128,6 +141,20 @@ export function StepCaption({
   return (
     <div className="flex flex-col gap-5">
       <h2 className="text-lg font-semibold text-white">Your caption</h2>
+
+      {/* Optional: specific context for the AI */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-[#555555] uppercase tracking-wider font-medium">
+          Anything specific to mention? <span className="normal-case text-[#444444]">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={specificContext}
+          onChange={(e) => setSpecificContext(e.target.value)}
+          placeholder='e.g. "mention the spring discount" or "reference the before/after photos"'
+          className="w-full bg-[#111111] border border-[#2a2a2a] rounded-md text-white text-sm px-3 h-9 placeholder:text-[#444444] focus:outline-none focus:border-[#E8732A] transition-colors"
+        />
+      </div>
 
       {/* Editable caption textarea */}
       <textarea

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
-import type { PostFormat, PostPlacement, ContentType, Platform } from '@/types'
+import type { PostFormat, PostPlacement, Platform } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -24,17 +24,6 @@ const FORMAT_PLACEMENT: Record<PostFormat, PostPlacement> = {
 
 const FORMATS = Object.keys(FORMAT_META) as PostFormat[]
 
-const CONTENT_TYPES: { value: ContentType; label: string }[] = [
-  { value: 'offer',         label: 'Offer / Promotion' },
-  { value: 'seasonal',      label: 'Seasonal' },
-  { value: 'trust',         label: 'Trust Builder' },
-  { value: 'differentiator',label: 'Differentiator' },
-  { value: 'social_proof',  label: 'Social Proof' },
-  { value: 'education',     label: 'Educational' },
-  { value: 'bts',           label: 'Behind the Scenes' },
-  { value: 'before_after',  label: 'Before & After' },
-]
-
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: 'instagram',  label: 'Instagram' },
   { value: 'facebook',   label: 'Facebook' },
@@ -50,7 +39,6 @@ const PLATFORMS: { value: Platform; label: string }[] = [
 export interface FormatValue {
   format: PostFormat
   placement: PostPlacement
-  contentType: ContentType
   platform: Platform
 }
 
@@ -64,7 +52,6 @@ interface StepFormatProps {
 interface ApiRecommendation {
   format: PostFormat
   placement: PostPlacement
-  content_type: ContentType
   reasoning: string
 }
 
@@ -103,7 +90,6 @@ export function StepFormat({ clientId, angle, value, onChange }: StepFormatProps
         onChange({
           format: data.format,
           placement: data.placement,
-          contentType: data.content_type,
           platform: value.platform,
         })
       } catch {
@@ -121,10 +107,6 @@ export function StepFormat({ clientId, angle, value, onChange }: StepFormatProps
 
   function handleFormatSelect(fmt: PostFormat) {
     onChange({ ...value, format: fmt, placement: FORMAT_PLACEMENT[fmt] })
-  }
-
-  function handleContentTypeChange(ct: ContentType) {
-    onChange({ ...value, contentType: ct })
   }
 
   function handlePlatformChange(p: Platform) {
@@ -197,33 +179,18 @@ export function StepFormat({ clientId, angle, value, onChange }: StepFormatProps
             </div>
           </div>
 
-          {/* Content type + platform row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-[#555555] uppercase tracking-wider font-medium">Content Type</label>
-              <select
-                value={value.contentType}
-                onChange={(e) => handleContentTypeChange(e.target.value as ContentType)}
-                className="w-full rounded-md bg-[#111111] border border-[#2a2a2a] text-white text-sm px-3 py-2 focus:outline-none focus:border-[#E8732A] transition-colors appearance-none"
-              >
-                {CONTENT_TYPES.map((ct) => (
-                  <option key={ct.value} value={ct.value}>{ct.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-[#555555] uppercase tracking-wider font-medium">Platform</label>
-              <select
-                value={value.platform}
-                onChange={(e) => handlePlatformChange(e.target.value as Platform)}
-                className="w-full rounded-md bg-[#111111] border border-[#2a2a2a] text-white text-sm px-3 py-2 focus:outline-none focus:border-[#E8732A] transition-colors appearance-none"
-              >
-                {PLATFORMS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-              </select>
-            </div>
+          {/* Platform selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-[#555555] uppercase tracking-wider font-medium">Platform</label>
+            <select
+              value={value.platform}
+              onChange={(e) => handlePlatformChange(e.target.value as Platform)}
+              className="w-full rounded-md bg-[#111111] border border-[#2a2a2a] text-white text-sm px-3 py-2 focus:outline-none focus:border-[#E8732A] transition-colors appearance-none"
+            >
+              {PLATFORMS.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
           </div>
         </>
       )}

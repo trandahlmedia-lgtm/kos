@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import type { ContentType } from '@/types'
 
 interface StepAngleProps {
   clientId: string
   clientName: string
   scheduledDate: string
+  contentType: ContentType | ''
   existingAngles: string[]
   value: string
   onChange: (angle: string) => void
@@ -17,6 +19,7 @@ export function StepAngle({
   clientId,
   clientName,
   scheduledDate,
+  contentType,
   existingAngles,
   value,
   onChange,
@@ -35,6 +38,7 @@ export function StepAngle({
           client_id: clientId,
           scheduled_date: scheduledDate,
           existing_angles: existingAngles,
+          content_type: contentType || undefined,
         }),
       })
 

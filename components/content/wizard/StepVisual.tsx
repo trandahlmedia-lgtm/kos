@@ -190,10 +190,14 @@ export function StepVisual({ wizardData, onPostCreated, onVisualReady }: StepVis
     void run()
   }, []) // intentionally empty — this effect must run exactly once on mount
 
-  // Iframe dimensions: story formats are 9:16, feed formats are 4:5
+  // Iframe dimensions: content is always 1080px wide; scale down to fit the wizard.
+  // Feed: 1080×1350 (4:5), Story: 1080×1920 (9:16)
   const isStory = wizardData.format === 'story_sequence' || wizardData.format === 'static_story'
-  const iframeWidth = isStory ? 350 : 500
-  const iframeHeight = isStory ? 622 : 630
+  const CONTENT_WIDTH = 1080
+  const contentHeight = isStory ? 1920 : 1350
+  const displayWidth = isStory ? 350 : 500
+  const scale = displayWidth / CONTENT_WIDTH
+  const displayHeight = Math.round(contentHeight * scale)
 
   // Build rendered HTML (inject editing script when edit mode is active)
   const generatedHtml = visual?.generated_html ?? null
@@ -413,17 +417,29 @@ export function StepVisual({ wizardData, onPostCreated, onVisualReady }: StepVis
         <p className="text-xs text-red-400">{error}</p>
       )}
 
-      {/* Visual iframe */}
+      {/* Visual iframe — set to full 1080px content width, scaled down to fit the wizard */}
       {iframeSrc && (
-        <iframe
-          key={editMode ? 'edit' : 'preview'}
-          ref={iframeRef}
-          src={iframeSrc}
-          title="Visual preview"
-          className="rounded-md border border-[#2a2a2a] bg-white"
-          style={{ width: iframeWidth, height: iframeHeight }}
-          sandbox={editMode ? 'allow-scripts allow-same-origin' : 'allow-scripts'}
-        />
+        <div
+          className="rounded-md border border-[#2a2a2a] overflow-hidden flex-shrink-0"
+          style={{ width: displayWidth, height: displayHeight }}
+        >
+          <iframe
+            key={editMode ? 'edit' : 'preview'}
+            ref={iframeRef}
+            src={iframeSrc}
+            title="Visual preview"
+            className="bg-white"
+            style={{
+              width: CONTENT_WIDTH,
+              height: contentHeight,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              border: 'none',
+              display: 'block',
+            }}
+            sandbox={editMode ? 'allow-scripts allow-same-origin' : 'allow-scripts'}
+          />
+        </div>
       )}
 
       {/* Action buttons */}

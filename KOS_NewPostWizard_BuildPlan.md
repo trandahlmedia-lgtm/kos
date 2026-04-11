@@ -158,6 +158,8 @@ If user closes wizard mid-way, post exists as `slot` and can be completed later 
 - Crop/reframe tool (separate task)
 - Slide-level editing (separate task)
 - **Date-aware angle suggestions** — Feed upcoming holidays, seasonal events, and industry-relevant dates (National Home Improvement Month, first frost timing, Memorial Day, etc.) into the angle suggestion AI. Static calendar of US holidays + home services seasonal triggers, plus optional web search for timely events. Layer onto StepAngle after wizard ships.
+- **Nano Banana AI photo generation** — Use Nano Banana API (Gemini-based, ~$0.02/image) to auto-generate photos for visual photo slots instead of manual upload. "Generate Photos" button in StepVisual sends each slot's description to the API, returns images, auto-fills slots. User can re-generate individual slots or upload their own to override. Needs: API key in .env, server-side utility for API calls, prompt logic using slot descriptions + client brand context. ~30-45 min build.
+- **Visual prompt quality tuning** — Current direct-mode prompts produce visuals that don't match the quality of the reference HTML files in reference-carousels/, reference-statics/, reference-stories/. Dedicated Opus session needed: compare reference HTML output against generated output, identify gaps in the system prompts (layout precision, typography, spacing, color usage), and rewrite prompts until generated visuals match reference quality. This is a prompt engineering session, not a code session.
 
 ---
 

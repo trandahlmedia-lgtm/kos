@@ -6,6 +6,11 @@ import { generateCaptionsForPost } from '@/lib/ai/generateCaptions'
 
 const requestSchema = z.object({
   postId: z.string().uuid(),
+  angle: z.string().max(500).optional(),
+  contentType: z.string().max(100).optional(),
+  format: z.string().max(50).optional(),
+  platform: z.string().max(50).optional(),
+  specificContext: z.string().max(500).optional(),
 })
 
 export async function POST(request: Request) {
@@ -39,7 +44,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid post ID' }, { status: 400 })
   }
 
-  const result = await generateCaptionsForPost(supabase, parsed.data.postId, user.id)
+  const { postId, angle, contentType, format, platform, specificContext } = parsed.data
+  const result = await generateCaptionsForPost(supabase, postId, user.id, {
+    angle,
+    contentType,
+    format,
+    platform,
+    specificContext,
+  })
 
   if (!result.success) {
     const status = result.error === 'Post not found' ? 404

@@ -25,6 +25,14 @@ export interface GenerateCaptionsResult {
   alternatives?: CaptionOption[]
 }
 
+interface CaptionOverrides {
+  angle?: string
+  contentType?: string
+  format?: string
+  platform?: string
+  specificContext?: string
+}
+
 /**
  * Generates 3 AI captions for a post and saves them to the DB.
  * Shared by both the single-caption and batch-caption routes.
@@ -32,7 +40,8 @@ export interface GenerateCaptionsResult {
 export async function generateCaptionsForPost(
   supabase: SupabaseClient,
   postId: string,
-  userId: string
+  userId: string,
+  overrides?: CaptionOverrides
 ): Promise<GenerateCaptionsResult> {
   // Fetch post + client brand doc
   const { data: post, error: postError } = await supabase
@@ -53,12 +62,18 @@ export async function generateCaptionsForPost(
     return { success: false, error: 'No brand document on file for this client' }
   }
 
-  // Extract angle + brief from ai_reasoning
+  // Extract angle + brief from ai_reasoning (fallback when no overrides provided)
   const reasoningParts = (post.ai_reasoning ?? '').split(' | ')
   const anglePart = reasoningParts.find((p: string) => p.startsWith('Angle: '))
   const briefPart = reasoningParts.find((p: string) => p.startsWith('Brief: '))
-  const angle = anglePart ? anglePart.replace('Angle: ', '') : post.ai_reasoning ?? ''
+  const dbAngle = anglePart ? anglePart.replace('Angle: ', '') : post.ai_reasoning ?? ''
   const captionBrief = briefPart ? briefPart.replace('Brief: ', '') : 'Write an engaging caption for this post'
+
+  // Use wizard overrides when provided — they carry live context not yet persisted to DB
+  const angle = overrides?.angle?.trim() || dbAngle
+  const specificContextLine = overrides?.specificContext?.trim()
+    ? `Additional context to incorporate: ${overrides.specificContext.trim()}`
+    : ''
 
   const startedAt = Date.now()
   const model = MODEL.default
@@ -67,11 +82,11 @@ export async function generateCaptionsForPost(
     const prompt = buildCaptionsPrompt({
       clientName,
       claudeMd,
-      platform: post.platform as Platform,
-      contentType: (post.content_type ?? 'trust') as ContentType,
-      format: 'static',
+      platform: (overrides?.platform as Platform | undefined) ?? (post.platform as Platform),
+      contentType: (overrides?.contentType as ContentType | undefined) ?? ((post.content_type ?? 'trust') as ContentType),
+      format: (overrides?.format ?? 'static') as 'static' | 'reel' | 'story',
       angle,
-      captionBrief,
+      captionBrief: specificContextLine ? `${captionBrief}\n${specificContextLine}` : captionBrief,
     })
 
     const result = await callClaude({

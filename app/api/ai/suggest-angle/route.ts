@@ -6,10 +6,16 @@ import { logAIRun } from '@/lib/ai/costTracker'
 import { checkRateLimit, userAction, LIMITS } from '@/lib/security/rateLimit'
 import { SUGGEST_ANGLE_SYSTEM, buildSuggestAnglePrompt } from '@/lib/ai/prompts/suggestAngle'
 
+const contentTypeEnum = z.enum([
+  'offer', 'seasonal', 'trust', 'differentiator',
+  'social_proof', 'education', 'bts', 'before_after',
+])
+
 const requestSchema = z.object({
   client_id: z.string().uuid(),
   scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   existing_angles: z.array(z.string()).default([]),
+  content_type: contentTypeEnum.optional(),
 })
 
 export async function POST(request: Request) {
@@ -43,7 +49,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
   }
 
-  const { client_id, scheduled_date, existing_angles } = parsed.data
+  const { client_id, scheduled_date, existing_angles, content_type } = parsed.data
 
   const { data: client, error: clientError } = await supabase
     .from('clients')
@@ -70,6 +76,7 @@ export async function POST(request: Request) {
       claudeMd: client.claude_md,
       scheduledDate: scheduled_date,
       existingAngles: existing_angles,
+      contentType: content_type,
     })
 
     const result = await callClaude({

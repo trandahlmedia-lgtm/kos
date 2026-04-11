@@ -8,9 +8,10 @@ import { type Client, type Post, type PostFormat, type PostPlacement, type Conte
 import { updatePostAction, updatePostStatusAction } from '@/lib/actions/posts'
 import { StepClient } from './wizard/StepClient'
 import { StepCalendar } from './wizard/StepCalendar'
+import { StepContentType } from './wizard/StepContentType'
 import { StepAngle } from './wizard/StepAngle'
 import { StepFormat } from './wizard/StepFormat'
-import { StepVisual } from './wizard/StepVisual'
+import { StepUpload } from './wizard/StepUpload'
 import { StepCaption } from './wizard/StepCaption'
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ export interface WizardData {
   contentType: ContentType | ''
   platform: Platform
   postId: string
-  visualId: string
+  creativeUrl: string
   caption: string
 }
 
@@ -47,10 +48,11 @@ interface NewPostWizardProps {
 const STEPS = [
   { number: 1, name: 'Client' },
   { number: 2, name: 'Date' },
-  { number: 3, name: 'Angle' },
-  { number: 4, name: 'Format' },
-  { number: 5, name: 'Visual' },
-  { number: 6, name: 'Caption' },
+  { number: 3, name: 'Type' },
+  { number: 4, name: 'Angle' },
+  { number: 5, name: 'Format' },
+  { number: 6, name: 'Creative' },
+  { number: 7, name: 'Caption' },
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -155,7 +157,7 @@ export function NewPostWizard({
     contentType: '',
     platform: 'instagram',
     postId: '',
-    visualId: '',
+    creativeUrl: '',
     caption: '',
   })
 
@@ -167,8 +169,8 @@ export function NewPostWizard({
     setWizardData((prev) => ({ ...prev, postId: id }))
   }, [])
 
-  const handleVisualReady = useCallback((id: string) => {
-    setWizardData((prev) => ({ ...prev, visualId: id }))
+  const handleCreativeUploaded = useCallback((mediaUrl: string) => {
+    setWizardData((prev) => ({ ...prev, creativeUrl: mediaUrl }))
   }, [])
 
   const handleCaptionReady = useCallback((caption: string) => {
@@ -177,9 +179,9 @@ export function NewPostWizard({
 
   if (!open) return null
 
-  const totalSteps = STEPS.length
+  const totalSteps = STEPS.length // 7
   const isFirstStep = currentStep === startStep
-  const isLastStep = currentStep === totalSteps
+  const isLastStep = currentStep === 7
 
   // Existing angles for the same client + same month (for AI dedup)
   const existingAngles = posts
@@ -194,10 +196,11 @@ export function NewPostWizard({
   const canAdvance =
     currentStep === 1 ? !!wizardData.clientId :
     currentStep === 2 ? !!wizardData.scheduledDate :
-    currentStep === 3 ? wizardData.angle.trim().length > 3 :
-    currentStep === 4 ? !!wizardData.format :
-    currentStep === 5 ? !!wizardData.visualId :
-    currentStep === 6 ? wizardData.caption.trim().length > 0 :
+    currentStep === 3 ? !!wizardData.contentType :
+    currentStep === 4 ? wizardData.angle.trim().length > 3 :
+    currentStep === 5 ? !!wizardData.format :
+    currentStep === 6 ? !!wizardData.creativeUrl :
+    currentStep === 7 ? wizardData.caption.trim().length > 0 :
     true
 
   function handleBack() {
@@ -244,7 +247,7 @@ export function NewPostWizard({
       contentType: '',
       platform: 'instagram',
       postId: '',
-      visualId: '',
+      creativeUrl: '',
       caption: '',
     })
   }
@@ -272,6 +275,11 @@ export function NewPostWizard({
   function handleDateSelect(date: string) {
     setWizardData((prev) => ({ ...prev, scheduledDate: date }))
     setCurrentStep(3)
+  }
+
+  function handleContentTypeSelect(contentType: ContentType) {
+    setWizardData((prev) => ({ ...prev, contentType }))
+    setCurrentStep(4)
   }
 
   const currentStepMeta = STEPS.find((s) => s.number === currentStep)!
@@ -313,39 +321,45 @@ export function NewPostWizard({
             />
           )}
           {currentStep === 3 && (
+            <StepContentType
+              onSelect={handleContentTypeSelect}
+              selected={wizardData.contentType}
+            />
+          )}
+          {currentStep === 4 && (
             <StepAngle
               clientId={wizardData.clientId}
               clientName={wizardData.clientName}
               scheduledDate={wizardData.scheduledDate}
+              contentType={wizardData.contentType}
               existingAngles={existingAngles}
               value={wizardData.angle}
               onChange={(angle) => setWizardData((prev) => ({ ...prev, angle }))}
             />
           )}
-          {currentStep === 4 && (
+          {currentStep === 5 && (
             <StepFormat
               clientId={wizardData.clientId}
               angle={wizardData.angle}
               value={{
                 format: (wizardData.format as PostFormat) || 'static',
                 placement: (wizardData.placement as PostPlacement) || 'feed',
-                contentType: (wizardData.contentType as ContentType) || 'education',
                 platform: wizardData.platform,
               }}
-              onChange={({ format, placement, contentType, platform }) =>
-                setWizardData((prev) => ({ ...prev, format, placement, contentType, platform }))
+              onChange={({ format, placement, platform }) =>
+                setWizardData((prev) => ({ ...prev, format, placement, platform }))
               }
             />
           )}
-          {currentStep === 5 && (
-            <StepVisual
+          {currentStep === 6 && (
+            <StepUpload
               wizardData={wizardData}
               clients={clients}
               onPostCreated={handlePostCreated}
-              onVisualReady={handleVisualReady}
+              onCreativeUploaded={handleCreativeUploaded}
             />
           )}
-          {currentStep === 6 && wizardData.postId && (
+          {currentStep === 7 && wizardData.postId && (
             <StepCaption
               postId={wizardData.postId}
               clientId={wizardData.clientId}
@@ -353,6 +367,7 @@ export function NewPostWizard({
               contentType={(wizardData.contentType as ContentType) || 'education'}
               angle={wizardData.angle}
               format={(wizardData.format as PostFormat) || 'static'}
+              placement={(wizardData.placement as PostPlacement) || 'feed'}
               onCaptionReady={handleCaptionReady}
             />
           )}

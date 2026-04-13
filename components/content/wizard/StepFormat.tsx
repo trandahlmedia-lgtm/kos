@@ -39,7 +39,7 @@ const PLATFORMS: { value: Platform; label: string }[] = [
 export interface FormatValue {
   format: PostFormat
   placement: PostPlacement
-  platform: Platform
+  platforms: Platform[]
 }
 
 interface StepFormatProps {
@@ -90,7 +90,7 @@ export function StepFormat({ clientId, angle, value, onChange }: StepFormatProps
         onChange({
           format: data.format,
           placement: data.placement,
-          platform: value.platform,
+          platforms: value.platforms,
         })
       } catch {
         if (!cancelled) setError('Failed to connect. Check your connection and try again.')
@@ -109,8 +109,12 @@ export function StepFormat({ clientId, angle, value, onChange }: StepFormatProps
     onChange({ ...value, format: fmt, placement: FORMAT_PLACEMENT[fmt] })
   }
 
-  function handlePlatformChange(p: Platform) {
-    onChange({ ...value, platform: p })
+  function handlePlatformToggle(p: Platform) {
+    const current = value.platforms
+    const next = current.includes(p)
+      ? current.length > 1 ? current.filter((x) => x !== p) : current
+      : [...current, p]
+    onChange({ ...value, platforms: next })
   }
 
   return (
@@ -179,18 +183,30 @@ export function StepFormat({ clientId, angle, value, onChange }: StepFormatProps
             </div>
           </div>
 
-          {/* Platform selector */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-[#555555] uppercase tracking-wider font-medium">Platform</label>
-            <select
-              value={value.platform}
-              onChange={(e) => handlePlatformChange(e.target.value as Platform)}
-              className="w-full rounded-md bg-[#111111] border border-[#2a2a2a] text-white text-sm px-3 py-2 focus:outline-none focus:border-[#E8732A] transition-colors appearance-none"
-            >
-              {PLATFORMS.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
+          {/* Platform multi-select */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-[#555555] uppercase tracking-wider font-medium">
+              Platforms <span className="normal-case text-[#444444]">(select all that apply)</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {PLATFORMS.map((p) => {
+                const isSelected = value.platforms.includes(p.value)
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => handlePlatformToggle(p.value)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                      isSelected
+                        ? 'bg-[#E8732A]/10 border-[#E8732A] text-white'
+                        : 'bg-[#111111] border-[#2a2a2a] text-[#999999] hover:border-[#E8732A]/50 hover:text-white'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </>
       )}

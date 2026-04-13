@@ -5,6 +5,7 @@ import { callClaude, MODEL } from '@/lib/ai/claude'
 import { logAIRun } from '@/lib/ai/costTracker'
 import { checkRateLimit, userAction, LIMITS } from '@/lib/security/rateLimit'
 import { SUGGEST_ANGLE_SYSTEM, buildSuggestAnglePrompt } from '@/lib/ai/prompts/suggestAngle'
+import { getUpcomingContext } from '@/lib/ai/seasonalCalendar'
 
 const contentTypeEnum = z.enum([
   'offer', 'seasonal', 'trust', 'differentiator',
@@ -72,11 +73,15 @@ export async function POST(request: Request) {
   const model = MODEL.fast
 
   try {
+    const scheduledDateObj = new Date(scheduled_date + 'T12:00:00')
+    const seasonalContext = getUpcomingContext(scheduledDateObj)
+
     const prompt = buildSuggestAnglePrompt({
       claudeMd: client.claude_md,
       scheduledDate: scheduled_date,
       existingAngles: existing_angles,
       contentType: content_type,
+      seasonalContext: seasonalContext || undefined,
     })
 
     const result = await callClaude({

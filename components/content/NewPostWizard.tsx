@@ -26,10 +26,10 @@ export interface WizardData {
   format: PostFormat | ''
   placement: PostPlacement | ''
   contentType: ContentType | ''
-  platform: Platform
+  platforms: Platform[]
   postId: string
   creativeUrl: string
-  caption: string
+  captions: Partial<Record<Platform, string>>
 }
 
 interface NewPostWizardProps {
@@ -155,10 +155,10 @@ export function NewPostWizard({
     format: '',
     placement: '',
     contentType: '',
-    platform: 'instagram',
+    platforms: ['instagram'],
     postId: '',
     creativeUrl: '',
-    caption: '',
+    captions: {},
   })
 
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
@@ -173,8 +173,8 @@ export function NewPostWizard({
     setWizardData((prev) => ({ ...prev, creativeUrl: mediaUrl }))
   }, [])
 
-  const handleCaptionReady = useCallback((caption: string) => {
-    setWizardData((prev) => ({ ...prev, caption }))
+  const handleCaptionsReady = useCallback((incomingCaptions: Partial<Record<Platform, string>>) => {
+    setWizardData((prev) => ({ ...prev, captions: incomingCaptions }))
   }, [])
 
   if (!open) return null
@@ -200,7 +200,7 @@ export function NewPostWizard({
     currentStep === 4 ? wizardData.angle.trim().length > 3 :
     currentStep === 5 ? !!wizardData.format :
     currentStep === 6 ? !!wizardData.creativeUrl :
-    currentStep === 7 ? wizardData.caption.trim().length > 0 :
+    currentStep === 7 ? wizardData.platforms.every((p) => (wizardData.captions[p] ?? '').trim().length > 0) :
     true
 
   function handleBack() {
@@ -220,7 +220,12 @@ export function NewPostWizard({
       }
       setFinishing(true)
       try {
-        await updatePostAction(wizardData.postId, { caption: wizardData.caption })
+        const primaryPlatform = wizardData.platforms[0] ?? 'instagram'
+        const primaryCaption = wizardData.captions[primaryPlatform] ?? ''
+        await updatePostAction(wizardData.postId, {
+          caption: primaryCaption,
+          cross_post_platforms: wizardData.platforms,
+        })
         await updatePostStatusAction(wizardData.postId, 'ready')
         router.refresh()
         onClose()
@@ -245,10 +250,10 @@ export function NewPostWizard({
       format: '',
       placement: '',
       contentType: '',
-      platform: 'instagram',
+      platforms: ['instagram'],
       postId: '',
       creativeUrl: '',
-      caption: '',
+      captions: {},
     })
   }
 
@@ -344,10 +349,10 @@ export function NewPostWizard({
               value={{
                 format: (wizardData.format as PostFormat) || 'static',
                 placement: (wizardData.placement as PostPlacement) || 'feed',
-                platform: wizardData.platform,
+                platforms: wizardData.platforms,
               }}
-              onChange={({ format, placement, platform }) =>
-                setWizardData((prev) => ({ ...prev, format, placement, platform }))
+              onChange={({ format, placement, platforms }) =>
+                setWizardData((prev) => ({ ...prev, format, placement, platforms }))
               }
             />
           )}
@@ -363,12 +368,12 @@ export function NewPostWizard({
             <StepCaption
               postId={wizardData.postId}
               clientId={wizardData.clientId}
-              platform={wizardData.platform}
+              platforms={wizardData.platforms}
               contentType={(wizardData.contentType as ContentType) || 'education'}
               angle={wizardData.angle}
               format={(wizardData.format as PostFormat) || 'static'}
               placement={(wizardData.placement as PostPlacement) || 'feed'}
-              onCaptionReady={handleCaptionReady}
+              onCaptionsReady={handleCaptionsReady}
             />
           )}
         </div>

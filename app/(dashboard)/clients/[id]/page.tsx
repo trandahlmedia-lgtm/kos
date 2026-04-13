@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import { ClientHubClient } from '@/components/clients/ClientHubClient'
+import { getLatestMetrics } from '@/lib/actions/metrics'
 
 interface ClientPageProps {
   params: Promise<{ id: string }>
@@ -38,6 +39,34 @@ export default async function ClientPage({ params }: ClientPageProps) {
     .eq('client_id', id)
     .gte('created_at', startOfMonth.toISOString())
 
+  // All posts for this client (for ContentTab)
+  const { data: allPosts } = await supabase
+    .from('posts')
+    .select('*')
+    .eq('client_id', id)
+    .order('scheduled_date', { ascending: false })
+
+  // Upcoming posts: next 5 scheduled from today, not published
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const { data: upcomingPosts } = await supabase
+    .from('posts')
+    .select('*')
+    .eq('client_id', id)
+    .neq('status', 'published')
+    .gte('scheduled_date', todayStr)
+    .order('scheduled_date', { ascending: true })
+    .limit(5)
+
+  // Client tasks
+  const { data: clientTasks } = await supabase
+    .from('client_tasks')
+    .select('*')
+    .eq('client_id', id)
+    .order('sort_order', { ascending: true })
+
+  // Latest 2 metric rows for arrow indicators
+  const latestMetrics = await getLatestMetrics(id)
+
   const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.name]))
 
   return (
@@ -47,6 +76,10 @@ export default async function ClientPage({ params }: ClientPageProps) {
       profiles={profiles ?? []}
       profileMap={profileMap}
       postsThisMonth={postsThisMonth ?? 0}
+      upcomingPosts={upcomingPosts ?? []}
+      allPosts={allPosts ?? []}
+      clientTasks={clientTasks ?? []}
+      latestMetrics={latestMetrics}
     />
   )
 }

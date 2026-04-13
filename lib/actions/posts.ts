@@ -113,6 +113,7 @@ export async function updatePostAction(
   postId: string,
   input: Partial<{
     platform: Platform
+    cross_post_platforms: Platform[]
     content_type: ContentType
     format: PostFormat
     placement: 'feed' | 'story'
@@ -139,6 +140,7 @@ export async function updatePostAction(
   const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
   if (clean.platform !== undefined) updatePayload.platform = clean.platform
+  if (Array.isArray(input.cross_post_platforms)) updatePayload.cross_post_platforms = input.cross_post_platforms
   if (clean.content_type !== undefined) updatePayload.content_type = clean.content_type ?? null
   if (clean.format !== undefined) updatePayload.format = clean.format
   if (clean.caption !== undefined) updatePayload.caption = clean.caption ?? null

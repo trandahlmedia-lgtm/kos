@@ -27,11 +27,21 @@ Rules:
    - Stories: 1-2 lines MAX, direct CTA only
 7. Return ONLY valid JSON — no markdown, no code fences, no explanation`
 
+const PLATFORM_AUDIENCE: Partial<Record<Platform, string>> = {
+  instagram: 'Younger homeowners and renters (28–42), visual-first, lifestyle-oriented — use punchy hooks and a conversational tone',
+  facebook: 'Older homeowners (45–65), community-minded, local trust signals matter — longer form is fine, lean into reliability and experience',
+  tiktok: 'Young adults (18–35), casual and trend-aware — hook in first 2 words, entertainment-first, keep it short',
+  linkedin: 'Business professionals and property managers — credibility-forward, benefit-led, more formal tone',
+  nextdoor: 'Local homeowners in the service area — hyper-local and neighborly, community trust is everything, no hype',
+}
+
 export function buildCaptionsPrompt(input: CaptionInput): string {
+  const audienceNote = PLATFORM_AUDIENCE[input.platform]
+
   return `Generate 3 caption options for this post.
 
 Client: ${input.clientName}
-Platform: ${input.platform}
+Platform: ${input.platform}${audienceNote ? `\nPlatform audience: ${audienceNote}` : ''}
 Content type: ${input.contentType.replace(/_/g, ' ')}
 Format: ${input.format}
 Angle: ${input.angle}

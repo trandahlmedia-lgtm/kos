@@ -3,24 +3,39 @@
 import { useState } from 'react'
 import { TodayView } from './TodayView'
 import { AgencyScorecard } from './AgencyScorecard'
-import { type Client, type Post } from '@/types'
+import { type Client, type Post, type ClientTask, type AgencyTask } from '@/types'
 
 interface DashboardTabsProps {
-  todayPosts: (Post & { clients?: { name: string } | null })[]
+  upcomingPosts: (Post & { clients?: { name: string } | null })[]
   clients: Client[]
   overdueInvoices: { id: string; amount: number }[]
   totalMrr: number
   overdueTotal: number
   today: string
+  clientTasks: (ClientTask & { clients?: { id: string; name: string } | null })[]
+  agencyTasks: AgencyTask[]
+  // Overview tab data
+  aiCostThisMonth: number
+  contentVelocityData: { week: string; count: number }[]
+  postsThisMonthByClient: Record<string, number>
+  onboardingPctByClient: Record<string, number>
+  weeklyWinsTasks: AgencyTask[]
 }
 
 export function DashboardTabs({
-  todayPosts,
+  upcomingPosts,
   clients,
   overdueInvoices,
   totalMrr,
   overdueTotal,
   today,
+  clientTasks,
+  agencyTasks,
+  aiCostThisMonth,
+  contentVelocityData,
+  postsThisMonthByClient,
+  onboardingPctByClient,
+  weeklyWinsTasks,
 }: DashboardTabsProps) {
   const [activeTab, setActiveTab] = useState<'today' | 'overview'>('today')
 
@@ -51,13 +66,24 @@ export function DashboardTabs({
       </div>
 
       {activeTab === 'today' ? (
-        <TodayView posts={todayPosts} clients={clients} today={today} />
+        <TodayView
+          clientTasks={clientTasks}
+          agencyTasks={agencyTasks}
+          upcomingPosts={upcomingPosts}
+          clients={clients}
+          today={today}
+        />
       ) : (
         <AgencyScorecard
           clients={clients}
           totalMrr={totalMrr}
           overdueInvoices={overdueInvoices}
           overdueTotal={overdueTotal}
+          aiCostThisMonth={aiCostThisMonth}
+          contentVelocityData={contentVelocityData}
+          postsThisMonthByClient={postsThisMonthByClient}
+          onboardingPctByClient={onboardingPctByClient}
+          weeklyWinsTasks={weeklyWinsTasks}
         />
       )}
     </div>

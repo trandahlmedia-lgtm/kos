@@ -14,7 +14,7 @@ interface StepUploadProps {
     format: PostFormat | ''
     placement: PostPlacement | ''
     contentType: ContentType | ''
-    platform: Platform
+    platforms: Platform[]
   }
   clients: Client[]
   onPostCreated: (postId: string) => void
@@ -39,7 +39,7 @@ export function StepUpload({ wizardData, onPostCreated, onCreativeUploaded }: St
 
     createPostAction({
       client_id: wizardData.clientId,
-      platform: wizardData.platform,
+      platform: wizardData.platforms[0] ?? 'instagram',
       content_type: (wizardData.contentType as ContentType) || undefined,
       format: (wizardData.format as PostFormat) || 'static',
       placement: (wizardData.placement as PostPlacement) || 'feed',

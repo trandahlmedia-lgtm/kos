@@ -20,6 +20,8 @@ export type MediaCategory = 'brand_asset' | 'creative' | 'footage' | 'export' | 
 export type AIWorkflow = 'content_calendar' | 'captions' | 'scripts' | 'design_brief' | 'lead_research' | 'analytics_report' | 'generate_claude_md' | 'platform_bios' | 'client_intake'
 export type InvoiceStatus = 'pending' | 'sent' | 'paid' | 'overdue' | 'cancelled'
 export type FilmingStatus = 'planned' | 'completed' | 'cancelled'
+export type TaskPriority = 'high' | 'medium' | 'low'
+export type TaskType = 'content' | 'admin' | 'tech' | 'ads' | 'seo' | 'planning'
 
 export interface Profile {
   id: string
@@ -35,6 +37,36 @@ export interface BrandLogos {
   wordmark_dark?: string
   wordmark_light?: string
   full?: string
+}
+
+export interface BrandColor {
+  name: string
+  hex: string
+  role: string
+}
+
+export interface BrandFonts {
+  headline: string
+  body: string
+}
+
+export interface BrandVoice {
+  keywords: string[]
+  description: string
+  dos: string[]
+  donts: string[]
+}
+
+export interface ContentPillar {
+  name: string
+  description: string
+}
+
+export interface TargetAudience {
+  age_range: string
+  location: string
+  traits: string[]
+  pain_points: string[]
 }
 
 export interface Client {
@@ -57,6 +89,11 @@ export interface Client {
   last_post_at?: string
   brand_logos: BrandLogos | null
   instagram_handle?: string
+  brand_colors: BrandColor[] | null
+  brand_fonts: BrandFonts | null
+  brand_voice: BrandVoice | null
+  content_pillars: ContentPillar[] | null
+  target_audience: TargetAudience | null
   notes?: string
   created_by?: string
   created_at: string
@@ -383,6 +420,11 @@ export interface ClientTask {
   completed: boolean
   completed_at?: string
   sort_order: number
+  priority: TaskPriority
+  due_date?: string
+  estimated_minutes?: number
+  task_type?: TaskType
+  description?: string
   created_by?: string
   created_at: string
 }
@@ -393,7 +435,30 @@ export interface AgencyTask {
   completed: boolean
   completed_at?: string
   sort_order: number
+  priority: TaskPriority
+  due_date?: string
+  estimated_minutes?: number
+  task_type?: TaskType
+  description?: string
   created_by?: string
+  created_at: string
+}
+
+export interface ClientMetric {
+  id: string
+  client_id: string
+  metric_date: string
+  website_sessions?: number
+  meta_reach?: number
+  meta_impressions?: number
+  meta_clicks?: number
+  meta_spend?: number
+  meta_leads?: number
+  google_reviews?: number
+  google_rating?: number
+  gbp_views?: number
+  gbp_clicks?: number
+  notes?: string
   created_at: string
 }
 

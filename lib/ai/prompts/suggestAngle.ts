@@ -28,11 +28,13 @@ export function buildSuggestAnglePrompt({
   scheduledDate,
   existingAngles,
   contentType,
+  seasonalContext,
 }: {
   claudeMd: string
   scheduledDate: string
   existingAngles: string[]
   contentType?: string
+  seasonalContext?: string
 }): string {
   const avoidSection =
     existingAngles.length > 0
@@ -43,5 +45,9 @@ export function buildSuggestAnglePrompt({
     ? `Content type: ${contentType.replace(/_/g, ' ')}\nAngle direction: ${CONTENT_TYPE_GUIDANCE[contentType]}\n\n`
     : ''
 
-  return `Here is the client's brand document:\n\n${claudeMd}\n\n${contentTypeGuidance}${avoidSection}Suggest ONE specific content angle for a post scheduled on ${scheduledDate}.`
+  const seasonalSection = seasonalContext
+    ? `${seasonalContext}\nIf any of this context is relevant to the client's services, lean into it for a timely angle.\n\n`
+    : ''
+
+  return `Here is the client's brand document:\n\n${claudeMd}\n\n${contentTypeGuidance}${seasonalSection}${avoidSection}Suggest ONE specific content angle for a post scheduled on ${scheduledDate}.`
 }

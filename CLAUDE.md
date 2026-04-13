@@ -1,6 +1,6 @@
 # KOS — Konvyrt Operating System
 
-Private internal tool for Konvyrt Marketing (Jay + Dylan). Replaces scattered docs, Meta Business Suite guessing, and manual lead tracking. Clients, content, leads, AI workflows, and billing in one place. **The client's `claude_md` field is the brain — every AI workflow reads from it.**
+Private internal tool for Konvyrt Marketing (Jay + Dylan). Replaces scattered docs, Meta Business Suite guessing, and manual lead tracking. Clients, content, leads, AI workflows, outreach, and billing in one place. **The client's `claude_md` field is the brain — every AI workflow reads from it.**
 
 ---
 
@@ -49,10 +49,10 @@ For content writing tasks (social media captions, ad copy, scripts): be minimal 
 <!-- Claude Code: At the end of each session, REPLACE everything between the markers below with a fresh 3-5 line snapshot. Do NOT grow this section. Delete the old content and write the new summary. Keep it under 6 lines. -->
 
 <!-- STATE:START -->
-**Last updated:** 2026-04-04
-**Phases 1-3 complete.** Auth, client hub, content engine, and AI workflows built and functional. Phase 3 passed Codex review, lint, and build clean.
-**Phase 4 is next:** Lead pipeline — full spec in `KOS_Phase4_BuildPlan.md`. Kickoff prompt in `KOS_SessionHandoff.md`.
-**Open TODO:** Add `MODEL.fast` (Haiku) to `lib/ai/claude.ts` as part of Phase 4 — research sub-agents use it.
+**Last updated:** 2026-04-12
+**Phases 1–4 complete. Phase 5 substantially built.** Auth, client hub, content engine (7-step wizard), 8 AI workflows, lead pipeline (kanban + 6-agent research + scoring + conversion), and outreach engine (cold email sequences + Resend integration) all operational. Build and lint pass clean. Deployed to kos-kohl.vercel.app.
+**Phase 6 is next:** Dashboard polish — Today view, analytics, billing/Stripe, lifecycle alerts.
+**Open items:** Media library UI incomplete (tables/routes exist, search/filter not built). Playwright PNG export not wired. Resend API key needed for live outreach sends. Cron jobs for follow-up automation not scheduled yet.
 <!-- STATE:END -->
 
 ---
@@ -70,19 +70,22 @@ For content writing tasks (social media captions, ad copy, scripts): be minimal 
 **Default to Haiku for subagent delegation.** Only escalate to Sonnet/Opus when the task genuinely requires multi-step reasoning or cross-file context.
 
 ### In KOS AI Workflows (API calls via `lib/ai/claude.ts`)
-| Workflow | Current | Recommended | Rationale |
-|----------|---------|-------------|-----------|
-| Weekly plan generation | Sonnet | **Sonnet** | Needs strategic thinking about content themes |
-| Caption generation (single post with brief) | Sonnet | **Haiku** | Brief already provides direction |
-| Caption generation (batch/no brief) | Sonnet | **Sonnet** | Must infer tone/themes from claude_md |
-| Brand doc generation | Sonnet | **Opus** | One-time, high-stakes doc that shapes all future output |
-| Platform bios | Sonnet | **Haiku** | Short-form, constrained output |
-| Client intake assistant | Sonnet | **Sonnet** | Conversational, needs good follow-up questions |
+| Workflow | Model | Rationale |
+|----------|-------|-----------|
+| Weekly plan generation | **Sonnet** | Needs strategic thinking about content themes |
+| Caption generation (single post with brief) | **Haiku** | Brief already provides direction |
+| Caption generation (batch/no brief) | **Sonnet** | Must infer tone/themes from claude_md |
+| Brand doc generation | **Opus** | One-time, high-stakes doc that shapes all future output |
+| Platform bios | **Haiku** | Short-form, constrained output |
+| Client intake assistant | **Sonnet** | Conversational, needs good follow-up questions |
+| Angle suggestion | **Haiku** | Quick suggestion with seasonal context |
+| Format recommendation | **Haiku** | Simple carousel vs. static decision |
+| Caption tweaks | **Haiku** | Fast refinement of existing caption |
+| Lead research (sub-agents) | **Haiku** | Each sub-agent is focused, single-task |
+| Lead research (orchestrator) | **Sonnet** | Synthesizes all sub-agent findings |
+| Outreach email drafting | **Sonnet** | Needs personalization from research data |
 
-**TODO:** Add `MODEL.fast = 'claude-haiku-4-5-20251001'` to `lib/ai/claude.ts` and update `PRICING` map. Then update individual workflow routes to use the recommended model tier.
-
-### Local/Open-Source Models
-Not recommended for KOS today. All current workflows need brand-aware, nuanced content generation. The ops overhead of running local inference doesn't justify the savings for a 2-person team. **Revisit in Phase 4** — bulk lead classification/scoring could be a fit for a local model.
+`MODEL.fast` (Haiku) is live in `lib/ai/claude.ts`. All models configured with cost tracking.
 
 ---
 
@@ -108,26 +111,62 @@ app/globals.css                   — Tailwind v4 @theme config, all design toke
 app/(auth)/login/                 — Login page (only unprotected route)
 app/(dashboard)/                  — All protected routes (layout.tsx has sidebar)
 app/(dashboard)/clients/          — Client list + [id] hub
-app/(dashboard)/content/          — Content engine (What's Next, calendar, schedule)
+app/(dashboard)/content/          — Content engine (What's Next, calendar, wizard)
 app/(dashboard)/workflows/        — AI workflow runner UI
+app/(dashboard)/leads/            — Lead pipeline (kanban + list view)
+app/(dashboard)/outreach/         — Outreach engine (drafts, hot leads, stats)
+app/(dashboard)/media/            — Media library (route exists, UI incomplete)
 proxy.ts                          — Auth guard (Next.js 16 convention, NOT middleware.ts)
 ```
 
 ### API Routes
 ```
+# Content Engine
 app/api/ai/weekly-plan/           — Weekly content plan generation
-app/api/ai/captions/              — Caption generation (single + batch)
+app/api/ai/captions/              — Caption generation (multi-platform)
+app/api/ai/suggest-angle/         — AI angle suggestion with seasonal context
+app/api/ai/recommend-format/      — Carousel vs. static recommendation
+app/api/ai/tweak-caption/         — Caption refinement (Haiku)
 app/api/ai/brand-doc/             — Brand document generation
-app/api/ai/platform-bios/        — Platform-specific bio generation
+app/api/ai/platform-bios/         — Platform-specific bio generation
 app/api/ai/client-intake/         — Client intake assistant
+app/api/ai/visuals/               — Visual content generation (HTML)
 app/api/media/upload/             — File upload to Supabase storage
+
+# Lead Pipeline
+app/api/leads/                    — Lead CRUD + filtering
+app/api/leads/[id]/               — Single lead operations
+app/api/leads/[id]/stage/         — Kanban stage changes + activity log
+app/api/leads/[id]/convert/       — Lead-to-client conversion
+app/api/leads/[id]/disqualify/    — Disqualify lead
+app/api/leads/[id]/requalify/     — Requalify lead
+app/api/ai/lead-research/         — Trigger full 6-agent research (fire-and-forget)
+app/api/ai/lead-research/running/ — Poll for research-in-progress
+app/api/ai/lead-research/status/  — Research status for specific lead
+app/api/ai/lead-research/process-one/ — Single lead research (for batch)
+app/api/ai/lead-research/active-status/ — Active batch status
+app/api/ai/lead-research/reset-stuck/  — Unstick stuck research
+app/api/ai/lead-score/            — Score a lead from research data
+app/api/ai/call-summary/          — Summarize call transcript
+
+# Outreach Engine
+app/api/ai/outreach-draft/        — Draft 4-email sequence for a lead
+app/api/ai/outreach-draft/active/ — Active draft status
+app/api/outreach/send/            — Send email via Resend
+app/api/outreach/unsubscribe/     — Handle unsubscribe
+app/api/cron/outreach-followups/  — Cron endpoint for scheduled sends
+app/api/webhooks/resend/          — Resend bounce/open tracking (partial)
 ```
 
 ### Components
 ```
-components/clients/               — Client hub, overview, onboarding, CLAUDE.md editor
+components/clients/               — Client hub, overview, onboarding, CLAUDE.md editor, brand assets
 components/content/               — Queue, calendar, day view, schedule panel
+components/content/wizard/        — New Post Wizard (7 steps: StepClient through StepCaption)
+components/content/NewPostWizard.tsx — Wizard shell, state, navigation
 components/workflows/             — Workflow page, dialogs, runners
+components/leads/                 — Kanban, lead cards, detail panel, research tab, notes tab, bulk import, convert dialog, batch research
+components/outreach/              — Review queue, email cards, email editor, hot leads, follow-ups, stats
 components/layout/                — Sidebar navigation
 components/shared/                — StatusBadge, PlatformIcon, EmptyState
 components/ui/                    — shadcn/ui primitives (don't modify directly)
@@ -135,12 +174,17 @@ components/ui/                    — shadcn/ui primitives (don't modify directl
 
 ### Lib (Business Logic)
 ```
-lib/ai/claude.ts                  — Claude API wrapper (MODEL config, callClaude, streamClaude, extractJSON)
+lib/ai/claude.ts                  — Claude API wrapper (MODEL.default + MODEL.fast + MODEL.powerful, callClaude, streamClaude, extractJSON)
 lib/ai/costTracker.ts             — Logs AI runs to ai_runs table (tokens, cost, duration)
-lib/ai/generateCaptions.ts        — Shared caption generation logic
-lib/ai/prompts/                   — Prompt templates: brandDoc, captions, clientIntake, platformBios, weeklyPlan
+lib/ai/generateCaptions.ts        — Multi-platform caption generation (generateCaptionsForPlatforms)
+lib/ai/seasonalCalendar.ts        — Holiday + HVAC seasonal context for angle suggestions
+lib/ai/leadResearch.ts            — 6-agent research system (website, social, business intel, service fit, pricing, orchestrator)
+lib/ai/outreachDraft.ts           — Cold email sequence drafting from research findings
+lib/ai/prompts/                   — 13 prompt templates (brandDoc, captions, clientIntake, platformBios, weeklyPlan, leadResearch, outreach, visuals, etc.)
 lib/actions/clients.ts            — Server actions: CRUD clients
 lib/actions/posts.ts              — Server actions: CRUD posts
+lib/actions/leads.ts              — Server actions: CRUD leads + stage changes + conversion
+lib/actions/outreach.ts           — Server actions: email operations
 lib/actions/onboarding.ts         — Server actions: onboarding steps
 lib/actions/auth.ts               — Server actions: auth helpers
 lib/security/rateLimit.ts         — Rate limiter (LIMITS.USER_HEAVY for AI endpoints)
@@ -162,10 +206,10 @@ components.json                   — shadcn/ui config
 
 ### Database
 ```
-supabase/migrations/              — SQL migration files
+supabase/migrations/              — 15 SQL migration files (all applied)
 ```
 
-Schema in Supabase. Tables: `profiles`, `clients`, `posts`, `captions`, `media`, `leads`, `onboarding_steps`, `ai_runs`, `invoices`, `activity_log`. Storage bucket: `kos-media`. RLS on all tables. Types mirrored in `types/index.ts`.
+Schema in Supabase. **17 tables:** `profiles`, `clients`, `posts`, `captions`, `media`, `post_visuals`, `leads`, `lead_research`, `lead_activities`, `outreach_emails`, `outreach_sequences`, `email_opt_outs`, `outreach_settings`, `onboarding_steps`, `ai_runs`, `invoices`, `platform_setups`. Storage bucket: `kos-media`. RLS on all tables. Types mirrored in `types/index.ts`.
 
 ---
 
@@ -176,9 +220,11 @@ Schema in Supabase. Tables: `profiles`, `clients`, `posts`, `captions`, `media`,
 | Framework | Next.js 16 (App Router, TypeScript) | No Pages Router. Check `node_modules/next/dist/docs/` for v16 conventions |
 | Database + Auth | Supabase | Postgres + GoTrue Auth |
 | Styling | Tailwind CSS v4 + shadcn/ui | Dark mode only. @theme in globals.css — NO tailwind.config.ts |
-| AI | Anthropic Claude API | Wrapper in `lib/ai/claude.ts`. Haiku/Sonnet/Opus tiered |
+| AI | Anthropic Claude API | Wrapper in `lib/ai/claude.ts`. Haiku/Sonnet/Opus tiered. Cost tracked. |
 | State | TanStack React Query | Client-side data fetching/caching |
 | Validation | Zod v4 | Server actions + API routes |
+| Drag & Drop | dnd-kit | Kanban board |
+| Email | Resend | Outreach sending (needs API key configured) |
 | Package manager | npm | |
 | Auth | `proxy.ts` (root) | Next.js 16 convention — not middleware.ts |
 
@@ -218,47 +264,15 @@ Font: Inter. Spacing: 4px base. Max radius: `rounded-md`. shadcn/ui as component
 
 ## Codex Review Plugin (Claude Code)
 
-Second-pass code review via OpenAI Codex, invoked directly from Claude Code. Useful for catching hidden assumptions, validating migrations/auth changes, and getting a different agent's perspective without leaving the workflow.
-
-### Prerequisites
-
-- ChatGPT subscription (including Free) or OpenAI API key
-- Node.js 18.18+
-- Codex CLI installed: `npm install -g @openai/codex`
-- Codex authenticated: `!codex login` (run inside Claude Code if needed)
-
-### Setup
-
-```bash
-/plugin marketplace add openai/codex-plugin-cc
-/plugin install codex@openai-codex
-/codex:setup
-```
-
-Optional review gate (blocks Claude Code exit until Codex review completes — use carefully, burns usage fast):
-```bash
-/codex:setup --enable-review-gate
-```
-
-### Core Commands
+Second-pass code review via OpenAI Codex, invoked directly from Claude Code.
 
 | Command | What it does |
 |---------|-------------|
 | `/codex:review` | Standard read-only Codex review |
 | `/codex:adversarial-review` | Skeptical challenge review — questions the implementation |
 | `/codex:rescue` | Hands the task to Codex directly |
-| `/codex:review --background` | Run review in background |
-| `/codex:status` | Check background job status |
-| `/codex:result` | Get background job result |
-| `/codex:cancel` | Cancel background job |
 
-### When to Use
-
-- **`/codex:review`** — Default second pass on all work.
-- **`/codex:adversarial-review`** — High-stakes changes: migrations, auth, infra scripts, refactors, anything where danger is hidden assumptions.
-- **`/codex:rescue`** — When a Claude Code thread stalls or you want Codex to take over.
-
-Plugin repo: https://github.com/openai/codex-plugin-cc
+Use `/codex:adversarial-review` for high-stakes changes: migrations, auth, infra scripts, refactors.
 
 ---
 
@@ -279,16 +293,43 @@ Plugin repo: https://github.com/openai/codex-plugin-cc
 
 ## Phases
 
-- **Phase 1 — COMPLETE:** Auth, sidebar, dashboard shell, client list, client hub (overview + CLAUDE.md editor + onboarding checklist)
-- **Phase 2 — COMPLETE:** Content engine (What's Next queue, weekly calendar, day view, schedule panel, creative upload, manual captions)
-- **Phase 3 — COMPLETE:** AI workflows (Claude API infra, weekly plan, captions, brand doc, platform bios, client intake, workflows page)
-- **Phase 4 — NEXT:** Lead pipeline (kanban, qualification scorecard, research agent, lead-to-client conversion)
-- **Phase 5:** Media library + filming sessions + platform setup module
-- **Phase 6:** Dashboard polish (Today view, scorecard, lifecycle alerts, analytics + billing)
+- **Phase 1 — COMPLETE:** Auth (invite-only), sidebar, dashboard shell, client list, client hub (overview + CLAUDE.md editor + onboarding checklist + brand assets)
+- **Phase 2 — COMPLETE:** Content engine (What's Next queue, weekly calendar, day view, schedule panel, creative upload, post status tracking)
+- **Phase 3 — COMPLETE:** AI workflows (Claude API infra with Haiku/Sonnet/Opus, weekly plan, captions, brand doc, platform bios, client intake, angle suggestion, format recommendation, caption tweaks, cost tracking — 8 workflows, 13 prompt templates)
+- **Phase 4 — COMPLETE:** Lead pipeline (7-stage kanban with drag-and-drop, bulk CSV import, 6-agent AI research system, lead scoring 0-100, heat classification, activity logging, lead-to-client conversion) + Outreach engine (4-email cold sequences, AI-drafted from research, Resend integration, draft/send/track, opt-out handling, outreach settings, outreach dashboard)
+- **Phase 5 — PARTIAL:** Visual engine (template-based HTML generation, color/font extraction, photo slots, export status tracking, media upload with thumbnails). Media library UI incomplete. PNG export not wired.
+- **Phase 6 — NOT STARTED:** Dashboard polish (Today view, analytics, lifecycle alerts, billing/Stripe, notifications)
 
 ## Not Building
 
-No public pages, no client portal, no Stripe, no mobile layout, no dark/light toggle, no Canva auto-gen (brief export only), no notifications (yet).
+No public pages, no client portal, no Stripe (yet — Phase 6), no mobile layout, no dark/light toggle, no Canva auto-gen (brief export only), no notifications (yet — Phase 6).
+
+---
+
+## TODO — What's Left to Build
+
+### Immediate (next session)
+- [ ] Complete media library UI (search, filter, organize)
+- [ ] Wire Playwright PNG export (1080x1350 / 1080x1920 captures)
+- [ ] Configure Resend API key + verified domain for live outreach sends
+- [ ] Schedule cron job for outreach follow-up automation
+- [ ] Wire Resend webhook for bounce/open tracking
+
+### Phase 6 (after immediate items)
+- [ ] Today view dashboard (functional, not just stub)
+- [ ] Analytics dashboard
+- [ ] Lifecycle alerts
+- [ ] Billing / Stripe integration
+- [ ] Email notifications
+
+### Future Ideas (captured, not scheduled)
+- [ ] KOS Ads Manager — Phase 1: Visual campaign planner wizard
+- [ ] KOS Ads Manager — Phase 2: Meta Marketing API integration (pull CPL, CTR, spend)
+- [ ] KOS Ads Manager — Phase 3: AI analysis on live ad data
+- [ ] Flux API integration ($0.03/image photorealistic AI)
+- [ ] Ideogram API (text-in-image AI)
+- [ ] Canva + Make.com batch automation
+- [ ] KOS as a sellable product / white-label tool
 
 ---
 
@@ -297,8 +338,6 @@ No public pages, no client portal, no Stripe, no mobile layout, no dark/light to
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Next.js 16 agent rules — read before touching routing/config |
-| `KOS_MasterBuildPlan.md` | Full build plan across all phases |
-| `KOS_Phase3_BuildPlan.md` | Phase 3 AI workflows detailed spec |
-| `KOS_Phase2_Amendments.md` | Phase 2 changes |
-| `KOS_AIWorkflow_ClientIntakeAssistant.md` | Client intake workflow spec |
-| `KOS_SessionHandoff.md` | Session handoff notes between builds |
+| `HYBRID_VISUAL_ENGINE_PLAN.md` | Current visual engine architecture (direct HTML generation) |
+| `KOS_SessionHandoff.md` | Session handoff notes — update every session |
+| `_archive/` | Old build plans and handoffs (historical reference only) |

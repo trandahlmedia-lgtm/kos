@@ -16,7 +16,7 @@ import {
   formatZodErrors,
 } from '@/lib/security/validation'
 import { adminClient } from '@/lib/supabase/admin'
-import type { BrandLogos } from '@/types'
+import type { BrandLogos, BrandColor, BrandFonts, BrandVoice, ContentPillar, TargetAudience } from '@/types'
 import {
   checkRateLimit,
   userAction,
@@ -349,4 +349,62 @@ export async function getSignedLogoUrls(
   }
 
   return result
+}
+
+// ---------------------------------------------------------------------------
+// updateClientBrandData
+// ---------------------------------------------------------------------------
+
+export interface BrandDataInput {
+  brand_colors?: BrandColor[]
+  brand_fonts?: BrandFonts
+  brand_voice?: BrandVoice
+  content_pillars?: ContentPillar[]
+  target_audience?: TargetAudience
+}
+
+/**
+ * Update a client's structured brand identity fields (JSONB columns).
+ */
+export async function updateClientBrandData(
+  clientId: string,
+  input: BrandDataInput
+): Promise<void> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const idResult = z.string().uuid('Invalid client ID').safeParse(clientId)
+  if (!idResult.success) throw new Error('Invalid client ID')
+
+  const rl = await checkRateLimit(
+    userAction(user.id, 'update_client_brand_data'),
+    LIMITS.USER_WRITE.max,
+    LIMITS.USER_WRITE.windowS
+  )
+  if (!rl.allowed) {
+    const secs = rl.retryAfter
+    throw new Error(`Rate limit exceeded. Please wait ${secs} second${secs !== 1 ? 's' : ''} and try again.`)
+  }
+
+  const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (input.brand_colors !== undefined) updatePayload.brand_colors = input.brand_colors
+  if (input.brand_fonts !== undefined) updatePayload.brand_fonts = input.brand_fonts
+  if (input.brand_voice !== undefined) updatePayload.brand_voice = input.brand_voice
+  if (input.content_pillars !== undefined) updatePayload.content_pillars = input.content_pillars
+  if (input.target_audience !== undefined) updatePayload.target_audience = input.target_audience
+
+  const { error } = await supabase
+    .from('clients')
+    .update(updatePayload)
+    .eq('id', idResult.data)
+
+  if (error) {
+    console.error('[updateClientBrandData] DB update failed:', error)
+    throw new Error('Failed to update brand data. Please try again.')
+  }
+
+  revalidatePath(`/clients/${idResult.data}`)
 }

@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit, userAction, LIMITS } from '@/lib/security/rateLimit'
-import { generateCaptionsForPost } from '@/lib/ai/generateCaptions'
+import { generateCaptionsForPost, generateCaptionsForPlatforms } from '@/lib/ai/generateCaptions'
+import type { Platform } from '@/types'
 
 const requestSchema = z.object({
   postId: z.string().uuid(),
   angle: z.string().max(500).optional(),
   contentType: z.string().max(100).optional(),
   format: z.string().max(50).optional(),
+  platforms: z.array(z.string().max(50)).min(1).max(5).optional(),
   platform: z.string().max(50).optional(),
   specificContext: z.string().max(500).optional(),
 })
@@ -44,7 +46,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid post ID' }, { status: 400 })
   }
 
-  const { postId, angle, contentType, format, platform, specificContext } = parsed.data
+  const { postId, angle, contentType, format, platforms, platform, specificContext } = parsed.data
+
+  // Multi-platform path
+  if (platforms && platforms.length > 0) {
+    const result = await generateCaptionsForPlatforms(supabase, postId, user.id, platforms as Platform[], {
+      angle,
+      contentType,
+      format,
+      specificContext,
+    })
+
+    if (!result.success) {
+      const status = result.error === 'Post not found' ? 404
+        : result.error?.includes('brand document') ? 422
+        : 500
+      return NextResponse.json({ error: result.error ?? 'Something went wrong.' }, { status })
+    }
+
+    return NextResponse.json({ platformCaptions: result.platformCaptions })
+  }
+
+  // Single-platform fallback (backward compat)
   const result = await generateCaptionsForPost(supabase, postId, user.id, {
     angle,
     contentType,

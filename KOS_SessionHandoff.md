@@ -1,106 +1,168 @@
-# KOS Content Engine — Session Handoff v7
+# KOS & Northern Standard — Session Handoff v9
 
 Drop this into a new Cowork session to pick up where we left off.
 
-## What We're Building
+## What's Active
 
-KOS — internal tool for Konvyrt Marketing. The **New Post Wizard** is the core content creation flow: a 7-step full-screen modal that walks through client selection, date picking, content type selection, AI angle suggestion, format/platform selection, creative upload, and AI caption generation.
+Two parallel tracks:
+1. **KOS** — Phases 1–4 complete, Phase 5 partially built. Content engine, lead pipeline, outreach engine all operational. Phase 6 (dashboard polish, analytics, billing) is next.
+2. **Northern Standard (Justin Fodor)** — Meta ads, analytics, AEO, and revenue-generating work. Analytics + Meta Pixel set up April 12. First ad campaign next.
 
-## What's Done (this session)
+---
 
-| Step | What | Status |
-|------|------|--------|
-| Strategic decision: remove AI visual generation | Researched AI ad creative landscape. Decided KOS should NOT generate visuals — it's the brain (strategy, captions, scheduling), not the designer. Creatives come from Canva or external tools. | Done |
-| StepUpload replaces StepVisual | Stripped out all HTML/CSS visual generation, iframe rendering, and inline editing. Replaced with a clean drag-and-drop upload component (143 lines). Upload → preview → replace flow. | Pushed |
-| Wizard reorder: Content Type before Angle | Content type (education, differentiator, seasonal, etc.) moved to step 3, before Angle (step 4). This lets the AI shape angle suggestions based on content type. | Pushed |
-| New StepContentType component | 8 content type cards with auto-advance on selection. 57 lines. | Pushed |
-| Content type removed from StepFormat | StepFormat now only handles format, placement, and platform. No more content type picker in it. | Pushed |
-| Angle AI uses content type | `suggest-angle` API route and prompt builder now accept contentType and inject type-specific guidance (e.g., "education" → suggest angles that teach). | Pushed |
-| Full wizard context passed to caption AI | Caption generation now receives angle, contentType, format, platform, and optional specificContext. Captions correlate with the rest of the wizard decisions. | Pushed |
-| "Anything specific to mention?" field | Optional text input added to StepCaption. User can add hyper-specific instructions (e.g., "mention the spring discount"). Passed to caption API as specificContext. | Pushed |
-| Save error fix attempted | `updatePostStatusAction` updated to use adminClient for the write to bypass RLS WITH CHECK restriction. **Fix did not fully resolve the issue — error persists.** | Needs Fix |
-| Build passes clean | `npm run lint` and `npm run build` both pass after all changes. | Confirmed |
+## KOS — Current State (April 12, 2026)
 
-## Known Bugs
+### What's Built & Working
 
-1. **Save error at wizard completion (BLOCKING)** — Clicking "Finish" on step 7 still throws:
-   ```
-   Failed to update status. Please try again.
-   at updatePostStatusAction (lib/actions/posts.ts:216:11)
-   ```
-   The first fix attempt (switching to adminClient for the write) didn't resolve it. The root cause needs deeper investigation — trace the full data flow: what status is the post currently in, what does the RLS policy expect, is the post record complete enough (all required fields), does the status transition from current → 'ready' make sense given the DB constraints. Read `lib/actions/posts.ts` around line 200-220, check the Supabase `posts` table RLS policies, and check if there's a `CHECK` constraint on the status column.
+**Content Engine (Phases 1–3):**
+- 7-step New Post Wizard: Client → Date → Content Type → Angle → Format → Creative → Caption
+- Multi-platform captions (Instagram, Facebook, TikTok, LinkedIn, Nextdoor) with per-platform tone
+- AI angle suggestions with seasonal calendar context (holidays + HVAC triggers)
+- AI format recommendations (carousel vs. static)
+- Caption tweaks on Haiku (fast refinement)
+- Weekly content plan generation (5 posts from claude_md)
+- Brand doc generation, platform bios, client intake assistant
+- Creative upload to Supabase storage
+- Visual HTML generation (template-based, color/font extraction, photo slots)
+- 8 AI workflows total, 13 prompt templates, all cost-tracked
 
-2. **Orange color perception issue** (cosmetic, non-blocking) — `#E8732A` appears slightly different in CSS vs logo PNG due to embedded Figma color profile. Fix: re-export logos from Figma with "Export as sRGB."
+**Lead Pipeline (Phase 4):**
+- 7-stage kanban: new → reached_out → connected → interested → proposal_sent → won → lost
+- Drag-and-drop kanban board (dnd-kit) + list view with sorting/filtering
+- Bulk CSV lead import
+- 6-agent AI research system: website auditor, social auditor, business intel, service fit, pricing recommender, orchestrator
+- Bulk research triggering (select multiple, run all)
+- AI scoring (0-100) + heat classification (hot/good/maybe/cut)
+- Lead activity logging (calls, notes, stage changes)
+- Lead-to-client conversion (pre-fills profile, preserves history)
+- Disqualify/requalify actions
 
-## What's NOT Done (in priority order)
+**Outreach Engine (Phase 4 continued):**
+- Cold email sequences — initial + 3 follow-ups per lead
+- AI-drafted emails personalized from research findings
+- Resend integration (ready to send, needs API key configured)
+- Draft/Queue/Sent/Opened/Replied/Bounced tracking
+- Email opt-out list + unsubscribe handling
+- Outreach settings (per-user from/reply-to, daily send limit, score threshold)
+- Outreach dashboard (review drafts, hot leads, stats, email editor)
+- Follow-up automation (cron route exists, not yet scheduled)
 
-1. **Fix the save error** — This is the #1 blocker. The wizard works end-to-end but can't save the finished post. Needs a Sonnet session focused on debugging `updatePostStatusAction` and the underlying Supabase query/RLS. Do NOT suppress the error — find and fix the root cause.
+### What's NOT Done Yet
 
-2. **Multi-platform caption generation** — Jay wants to select multiple platforms (e.g., Facebook + Instagram) and get platform-specific captions for each. The Post type already has `cross_post_platforms: Platform[]`. Plan:
-   - Multi-select platforms in StepFormat
-   - Store selected platforms in `cross_post_platforms`
-   - StepCaption generates one caption per platform, tuned to each platform's audience (Facebook = older, Instagram = younger)
-   - Tab or section view to review/tweak each platform's caption independently
+**Immediate items:**
+- [ ] Media library UI (search, filter, organize) — tables/routes exist, UI incomplete
+- [ ] Playwright PNG export (1080x1350 / 1080x1920)
+- [ ] Configure Resend API key + verified domain for live sends
+- [ ] Schedule cron for outreach follow-ups
+- [ ] Wire Resend webhook for bounce/open tracking
 
-3. **Visual prompt quality tuning** — No longer blocking (since we removed visual generation from wizard), but the reference HTML files in `reference-carousels/`, `reference-statics/`, `reference-stories/` still exist. Could be useful if AI image generation is added later via Flux/Ideogram API.
+**Phase 6 (not started):**
+- [ ] Today view dashboard (stub exists, not functional)
+- [ ] Analytics dashboard
+- [ ] Lifecycle alerts
+- [ ] Billing / Stripe
+- [ ] Notifications
 
-4. **Nano Banana AI photo generation** — Deferred. Was going to use Nano Banana API for auto-filling photo slots. No longer relevant with the upload-based approach. Revisit if we add an "AI Assist" option to generate starting images.
+### Infrastructure
 
-5. **Date-aware angle suggestions** — Feed upcoming holidays, seasonal events, industry dates into the angle suggestion AI. Static calendar of US holidays + home services seasonal triggers.
+- **Git:** All changes committed and pushed to main
+- **Vercel:** Auto-deploys from main to kos-kohl.vercel.app
+- **Database:** 17 tables, 15 migrations applied to Supabase, RLS on all
+- **Migrations:** After any new migration file, run SQL manually in Supabase dashboard SQL Editor
 
-6. **Playwright PNG export** — Server-side capture of slides as downloadable PNGs. Lower priority now.
+### Build commands:
+```bash
+npm run dev          # Dev server → http://localhost:3000
+npm run build        # Production build
+npm run lint         # ESLint
+```
 
-## Key Context for Next Session
+---
 
-* **KOS repo:** `C:\Users\jaytr\HQ\Projects\kos`
-* **Build plan:** `KOS_NewPostWizard_BuildPlan.md` in repo root
-* **Wizard flow (7 steps):** Client → Date → Content Type → Angle → Format → Creative (upload) → Caption
-* **Wizard files:**
-  - `components/content/NewPostWizard.tsx` — main wizard shell, state, navigation
-  - `components/content/wizard/StepClient.tsx` — client picker cards
-  - `components/content/wizard/StepCalendar.tsx` — month calendar, date selection
-  - `components/content/wizard/StepContentType.tsx` — NEW: content type cards (8 types)
-  - `components/content/wizard/StepAngle.tsx` — text input + AI suggest (now uses contentType)
-  - `components/content/wizard/StepFormat.tsx` — format, placement, platform (content type removed)
-  - `components/content/wizard/StepUpload.tsx` — NEW: drag-and-drop creative upload + preview
-  - `components/content/wizard/StepCaption.tsx` — AI caption generation + tweak + specific context field
-* **Save error location:** `lib/actions/posts.ts` line ~216, `updatePostStatusAction`
-* **The old StepVisual.tsx is dead code** — can be deleted if it still exists
-* **MODEL.fast** exists in `lib/ai/claude.ts` — Haiku used for angle suggestion, format recommendation, and caption tweaking
-* **Git:** All changes committed and pushed to main
-* **Vercel:** Auto-deploys from main to kos-kohl.vercel.app
-* **Migrations:** After any new migration file, run SQL manually in Supabase dashboard SQL Editor
-* **Strategic decision this session:** KOS does NOT generate creatives. It's the brain — strategy, angles, captions, scheduling. Creatives come from Canva or external AI tools (Flux, Ideogram if added later). Upload-based workflow.
+## Northern Standard — Current Priorities (April 12–18)
 
-## Ideas Captured
+### Done (April 12):
+- [x] Cloudflare Web Analytics enabled
+- [x] GA4 connected via Cloudflare Zaraz (Measurement ID: G-MVX69N51JV)
+- [x] Meta Pixel connected via Zaraz (Pixel ID: 2197808841033364) — awaiting verification
 
-* **Multi-platform captions** — Different captions per platform from one post. Facebook (older audience) vs Instagram (younger). Architecture supports it via `cross_post_platforms` field.
-* **Flux API integration** — $0.03/image, most photorealistic AI image generator with official API. Could add as optional "AI Assist" button in upload step later.
-* **Ideogram API** — Best at rendering readable text in images. Good for promo graphics, seasonal offers. $0.01-0.08/image.
-* **Canva + Make.com automation** — Batch-fill Canva templates from post data. No-code, ~$10/month. Alternative to building image generation into KOS.
-* **AdCreative.ai** — Full ad creative generation platform. $39-249/month. Could be used alongside KOS for static ad generation.
+### This Week:
+- [ ] Verify Meta Pixel is firing (check Events Manager for PageView events)
+- [ ] Review + send marketing services contract to Justin ($2,500/mo)
+- [ ] Launch first Meta ad campaign — Furnace Replacement ($15-20/day, two ad variations)
+- [ ] AEO / JSON-LD structured data on Astro site (Claude Code Sonnet session)
+- [ ] GBP optimization + review request system
 
-## Recommended Next Steps
+### Ad Campaign Plan (Furnace Replacement):
+- **Budget:** $15-20/day
+- **Audience:** 50mi from St. Paul, homeowners, 35-65
+- **Ad 1:** GE Warranty hook (12-year parts, 12-year labor, lifetime heat exchanger)
+- **Ad 2:** Upfront Pricing hook (exact cost before work begins)
+- **Landing:** Furnace install page (not homepage)
+- **After 7 days:** Kill loser, scale winner, launch retargeting
 
-1. **Fix the save error** (Sonnet, 15-30 min) — Debug `updatePostStatusAction`. Trace the Supabase query, check RLS policies, check status constraints. This unblocks the entire wizard.
-2. **Multi-platform captions** (Sonnet, 45-60 min) — Multi-select platforms, per-platform caption generation with audience tuning.
-3. **Clean up dead code** (Haiku, 5 min) — Delete old `StepVisual.tsx` and any unused visual generation imports if they still exist.
+### Contract
+**Built.** `Northern Standard/Docs/Konvyrt_NorthernStandard_MarketingServicesAgreement.docx`
+$2,500/mo retainer. Ad spend billed separately ($500 min recommended). Month-to-month, 30-day notice.
+**Action:** Jay reviews, considers attorney review, sends to Justin.
 
-## Jay's Preferences Reminder
+---
 
-* Direct and efficient. No fluff.
-* Concrete next steps, not theory.
-* Walk him through step by step — one prompt at a time.
-* He pastes prompts into Claude Code terminal.
-* Cowork's job: write the prompts, track progress, pressure-test plans.
-* Don't change things he didn't ask to change. No regressions.
-* Model note: Opus for planning/architecture, Sonnet for standard builds, Haiku for simple lookups.
-* Help Jay use the right model for each task — don't burn credits on overkill.
-* Keep responses structured: what to do now, what's next, why.
-* Save every idea he mentions — don't let anything get lost.
-* Never assume he knows terminal/git commands — write exact copy-paste instructions.
-* One step at a time. Don't give him a list of 5 things. Give step 1, wait for confirmation, then step 2.
-* Before executing anything, be 95% confident you understand the ask. If not, ask.
-* When fixing something, actually fix it — never hide the problem.
+## Website Tech Stack (Northern Standard)
 
-Last updated: 2026-04-11. Wizard rebuilt to 7 steps. AI visual generation removed. Upload-based creative flow. Content type shapes angle suggestions. Full context flows into caption generation. Save error still open.
+- **Framework:** Astro 6 + React
+- **Hosting:** Cloudflare Pages
+- **Domain:** northernstandardhvac.com
+- **Source:** `C:\HQ\Clients\Northern Standard\Deliverables\Website\source\`
+- **Styling:** Tailwind CSS v4
+- **Email:** Resend
+
+---
+
+## Active Clients
+
+| Client | Status | Next action |
+|--------|--------|-------------|
+| Northern Standard | Active — $2,500/mo, contract ready | Send contract, launch ads |
+| College Works Painting | Brand kit done | Content audit, establish posting cadence |
+| allbeautybylily | Brand kit done | Scope + build website |
+| Ian Mercil - Peptides | New prospect | Discovery call, collect brand info |
+| Owens Detailing | Empty | Needs brand info or archive |
+| Vyntyge | Empty | Needs brand info or archive |
+
+---
+
+## Ideas Captured (not lost)
+
+- **KOS Ads Manager** — Phase 1: Visual campaign planner. Phase 2: Meta API data pull. Phase 3: AI analysis. Jay's principle: "Authority to manipulate anything, AI assistance at every step."
+- **Flux API** — $0.03/image photorealistic. Add to upload step.
+- **Ideogram API** — Text-in-image AI. $0.01-0.08/image. Promo graphics.
+- **Canva + Make.com** — Batch-fill templates from post data. ~$10/mo.
+- **Google LSAs** — Pay-per-lead, Google Guaranteed. After Meta ads stable.
+- **Email/SMS marketing** — In NS contract scope. After ads + analytics live.
+- **KOS as product** — Long-term. White-label / sell to other agencies.
+
+---
+
+## Jay's Preferences
+
+- Direct and efficient. No fluff. Concrete next steps.
+- One step at a time. Don't give 5 things — give step 1, wait for confirmation.
+- Not technical — write exact copy-paste commands for Claude Code.
+- Opus for planning, Sonnet for builds, Haiku for lookups.
+- 95% confidence before executing. Ask if unsure.
+- Update this handoff doc every session.
+- Never assume he knows terminal/git commands.
+
+---
+
+## Documentation Cleanup (April 12)
+
+13 outdated docs moved to `_archive/` folder. CLAUDE.md fully rewritten. Only active docs remain at root:
+- `CLAUDE.md` — Project instructions (current)
+- `AGENTS.md` — Next.js 16 rules
+- `HYBRID_VISUAL_ENGINE_PLAN.md` — Visual engine architecture
+- `KOS_SessionHandoff.md` — This file (update every session)
+- `_archive/` — Old build plans and handoffs (historical reference)
+
+Last updated: 2026-04-12
